@@ -45,13 +45,17 @@ xcodebuild build \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY="" \
-  AD_HOC_CODE_SIGNING_ALLOWED=YES
+  AD_HOC_CODE_SIGNING_ALLOWED=YES \
+  ENABLE_BITCODE=NO \
+  COMPILER_INDEX_STORE_ENABLE=NO
 
-APP_SRC="$DERIVED_DATA/Build/Products/Release-iphoneos/sing-box.app"
-if [[ ! -d "$APP_SRC" ]]; then
-  echo "Error: sing-box.app was not produced at $APP_SRC" >&2
+APP_SRC="$(find "$DERIVED_DATA/Build/Products/Release-iphoneos" -maxdepth 1 -name "*.app" 2>/dev/null | head -n 1)"
+if [[ -z "$APP_SRC" || ! -d "$APP_SRC" ]]; then
+  echo "Error: .app was not produced under $DERIVED_DATA/Build/Products/Release-iphoneos" >&2
+  ls -la "$DERIVED_DATA/Build/Products" || true
   exit 1
 fi
+echo "==> Found app bundle at: $APP_SRC"
 
 STAGE_DIR="$APPLE_ROOT/build/ipa_stage"
 rm -rf "$STAGE_DIR"
