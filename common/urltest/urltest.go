@@ -97,7 +97,7 @@ func URLTest(ctx context.Context, link string, detour N.Dialer) (uint16, error) 
 
 func urlTest(ctx context.Context, link string, detour N.Dialer) (t uint16, err error) {
 	if link == "" {
-		link = "https://www.gstatic.com/generate_204"
+		link = "http://www.gstatic.com/generate_204"
 	}
 	linkURL, err := url.Parse(link)
 	if err != nil {
@@ -120,9 +120,11 @@ func urlTest(ctx context.Context, link string, detour N.Dialer) (t uint16, err e
 		return
 	}
 	defer instance.Close()
-	if N.NeedHandshakeForWrite(instance) {
-		start = time.Now()
+	connectDelay := uint16(time.Since(start) / time.Millisecond)
+	if connectDelay == 0 {
+		connectDelay = 1
 	}
+
 	req, err := http.NewRequest(http.MethodHead, link, nil)
 	if err != nil {
 		return
@@ -148,6 +150,6 @@ func urlTest(ctx context.Context, link string, detour N.Dialer) (t uint16, err e
 		return
 	}
 	resp.Body.Close()
-	t = uint16(time.Since(start) / time.Millisecond)
+	t = connectDelay
 	return
 }
