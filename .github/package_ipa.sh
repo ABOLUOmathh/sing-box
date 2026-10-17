@@ -42,6 +42,7 @@ xcodebuild build \
   -destination 'generic/platform=iOS' \
   -derivedDataPath "$DERIVED_DATA" \
   -skipPackagePluginValidation \
+  -skipMacroValidation \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY="" \

@@ -29,3 +29,101 @@ index 34652c6..e94ca15 100644
      private static let minimumSemver = "0.0.0-0"
  
      public static func checkAsync(track: UpdateTrack, githubToken: String = "", force: Bool = false) async throws -> UpdateInfo? {
+diff --git a/sing-box.xcodeproj/project.pbxproj b/sing-box.xcodeproj/project.pbxproj
+index 36d0bcb..6f1ce70 100644
+--- a/sing-box.xcodeproj/project.pbxproj
++++ b/sing-box.xcodeproj/project.pbxproj
+@@ -49,8 +49,6 @@
+ 		3AE595822F08C3D400C13426 /* Library.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3AEC211D2A459B4700A63465 /* Library.framework */; };
+ 		3AE595AA2F08C61600C13426 /* RootHelper in Copy Helpers */ = {isa = PBXBuildFile; fileRef = 3AE595712F08C34000C13426 /* RootHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+ 		3AE595B02F08D00000C13426 /* HelperService/LaunchDaemons/io.nekohasekai.sfamt.helper.plist in Copy LaunchDaemon */ = {isa = PBXBuildFile; fileRef = 3AE595AE2F08D00000C13426 /* HelperService/LaunchDaemons/io.nekohasekai.sfamt.helper.plist */; };
+-		3AE8490F2FC559980016E814 /* GhosttyTerminal in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, ); productRef = 3AE8490E2FC559980016E814 /* GhosttyTerminal */; };
+-		3AE849112FC559A30016E814 /* GhosttyTheme in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, ); productRef = 3AE849102FC559A30016E814 /* GhosttyTheme */; };
+ 		3AEAEE992A4F16430059612D /* Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3A096F862A4ED3DE00D4A2ED /* Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+ 		3AEECBF22A6DF40A006A0E0C /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3AF342B12A4AA520002B34AC /* NetworkExtension.framework */; };
+ 		3AEECC1A2A6DFA79006A0E0C /* io.nekohasekai.sfamt.system.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = 3AEECBF12A6DF40A006A0E0C /* io.nekohasekai.sfamt.system.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+@@ -1119,8 +1117,6 @@
+ 			packageProductDependencies = (
+ 				3A4A020C2B53E3DC004EFB87 /* QRCode */,
+ 				3A4CA8CB2F75381F009C36CA /* MarkdownUI */,
+-				3AE8490E2FC559980016E814 /* GhosttyTerminal */,
+-				3AE849102FC559A30016E814 /* GhosttyTheme */,
+ 			);
+ 			productName = ApplicationLibrary;
+ 			productReference = 3A4EAD102A4FEAE6005435B3 /* ApplicationLibrary.framework */;
+@@ -1672,7 +1668,6 @@
+ 				3ACE5E012EE1A91100644196 /* XCRemoteSwiftPackageReference "CodeEditSourceEditor" */,
+ 				3A4CA8CA2F75381F009C36CA /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+ 				3A5AA1B82F7DB10900BA2A0D /* XCRemoteSwiftPackageReference "plcrashreporter" */,
+-				3AC6CFCF2FC07CA200F5B0AE /* XCRemoteSwiftPackageReference "libghostty-spm" */,
+ 				3AC89DD32FCD9E3B002A14E8 /* XCRemoteSwiftPackageReference "DeviceKit" */,
+ 			);
+ 			productRefGroup = 3AEC20C72A45991900A63465 /* Products */;
+@@ -4086,14 +4081,6 @@
+ 				minimumVersion = 4.0.0;
+ 			};
+ 		};
+-		3AC6CFCF2FC07CA200F5B0AE /* XCRemoteSwiftPackageReference "libghostty-spm" */ = {
+-			isa = XCRemoteSwiftPackageReference;
+-			repositoryURL = "https://github.com/Lakr233/libghostty-spm";
+-			requirement = {
+-				kind = upToNextMajorVersion;
+-				minimumVersion = 2.2.2026100703;
+-			};
+-		};
+ 		3AC89DD32FCD9E3B002A14E8 /* XCRemoteSwiftPackageReference "DeviceKit" */ = {
+ 			isa = XCRemoteSwiftPackageReference;
+ 			repositoryURL = "https://github.com/devicekit/DeviceKit.git";
+@@ -4171,16 +4158,6 @@
+ 			package = 3AD0F1022FD1000100000003 /* XCRemoteSwiftPackageReference "LegacyBinaryCodable" */;
+ 			productName = LegacyBinaryCodable;
+ 		};
+-		3AE8490E2FC559980016E814 /* GhosttyTerminal */ = {
+-			isa = XCSwiftPackageProductDependency;
+-			package = 3AC6CFCF2FC07CA200F5B0AE /* XCRemoteSwiftPackageReference "libghostty-spm" */;
+-			productName = GhosttyTerminal;
+-		};
+-		3AE849102FC559A30016E814 /* GhosttyTheme */ = {
+-			isa = XCSwiftPackageProductDependency;
+-			package = 3AC6CFCF2FC07CA200F5B0AE /* XCRemoteSwiftPackageReference "libghostty-spm" */;
+-			productName = GhosttyTheme;
+-		};
+ /* End XCSwiftPackageProductDependency section */
+ 	};
+ 	rootObject = 3AEC20BD2A45991900A63465 /* Project object */;
+diff --git a/sing-box.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved b/sing-box.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+index 0abf72d..6012799 100644
+--- a/sing-box.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
++++ b/sing-box.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+@@ -55,15 +55,6 @@
+         "version" : "5.8.0"
+       }
+     },
+-    {
+-      "identity" : "displaylink",
+-      "kind" : "remoteSourceControl",
+-      "location" : "https://github.com/Lakr233/DisplayLink.git",
+-      "state" : {
+-        "revision" : "41bea2661e04bebcb1c4f15fc0b6197850100fdd",
+-        "version" : "3.0.1"
+-      }
+-    },
+     {
+       "identity" : "grdb.swift",
+       "kind" : "remoteSourceControl",
+@@ -82,15 +73,6 @@
+         "version" : "2.0.3"
+       }
+     },
+-    {
+-      "identity" : "libghostty-spm",
+-      "kind" : "remoteSourceControl",
+-      "location" : "https://github.com/Lakr233/libghostty-spm",
+-      "state" : {
+-        "revision" : "cffef22c16dd61d22ebef539ae2ff1624db77363",
+-        "version" : "2.2.2026100703"
+-      }
+-    },
+     {
+       "identity" : "networkimage",
+       "kind" : "remoteSourceControl",

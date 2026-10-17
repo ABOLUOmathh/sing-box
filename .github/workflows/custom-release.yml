@@ -63,7 +63,7 @@ jobs:
           if [ -f .github/apple_custom.patch ]; then
             echo "Applying apple_custom.patch..."
             cd clients/apple
-            git apply ../../.github/apple_custom.patch || true
+            git apply --verbose ../../.github/apple_custom.patch
             cd ../..
           fi
 
