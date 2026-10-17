@@ -34,6 +34,12 @@ DERIVED_DATA="$APPLE_ROOT/build/DerivedData"
 rm -rf "$DERIVED_DATA"
 mkdir -p "$DERIVED_DATA"
 
+# Safety guarantee: ensure Swift 5 compatibility for deinit in ExtensionProfile.swift
+if [[ -f "$APPLE_ROOT/Library/Network/ExtensionProfile.swift" ]]; then
+  sed -i '' 's/nonisolated deinit/deinit/g' "$APPLE_ROOT/Library/Network/ExtensionProfile.swift" 2>/dev/null || \
+  sed -i 's/nonisolated deinit/deinit/g' "$APPLE_ROOT/Library/Network/ExtensionProfile.swift" 2>/dev/null || true
+fi
+
 echo "==> Compiling SFI scheme with xcodebuild..."
 xcodebuild build \
   -project sing-box.xcodeproj \
@@ -73,10 +79,14 @@ find "$APP_DEST" -name '.DS_Store' -delete
 # Sign entitlements with ldid if available
 if command -v ldid >/dev/null 2>&1; then
   echo "==> Signing binaries with ldid and native entitlements..."
-  if [[ -f "$APPLE_ROOT/SFI/SFI.entitlements" ]]; then
-    ldid -S"$APPLE_ROOT/SFI/SFI.entitlements" "$APP_DEST/sing-box"
-  else
-    ldid -S "$APP_DEST/sing-box"
+  MAIN_BIN="$APP_DEST/sing-box"
+  if [[ ! -f "$MAIN_BIN" ]]; then
+    MAIN_BIN="$(find "$APP_DEST" -maxdepth 1 -type f -perm +111 2>/dev/null | head -n 1)"
+  fi
+  if [[ -f "$APPLE_ROOT/SFI/SFI.entitlements" && -n "$MAIN_BIN" && -f "$MAIN_BIN" ]]; then
+    ldid -S"$APPLE_ROOT/SFI/SFI.entitlements" "$MAIN_BIN"
+  elif [[ -n "$MAIN_BIN" && -f "$MAIN_BIN" ]]; then
+    ldid -S "$MAIN_BIN"
   fi
 
   if [[ -d "$APP_DEST/PlugIns" ]]; then

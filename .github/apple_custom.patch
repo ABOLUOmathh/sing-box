@@ -127,3 +127,16 @@ index 0abf72d..6012799 100644
      {
        "identity" : "networkimage",
        "kind" : "remoteSourceControl",
+diff --git a/Library/Network/ExtensionProfile.swift b/Library/Network/ExtensionProfile.swift
+index c0b3f90..3998a62 100644
+--- a/Library/Network/ExtensionProfile.swift
++++ b/Library/Network/ExtensionProfile.swift
+@@ -111,7 +111,7 @@ public class ExtensionProfile: ObservableObject {
+         }
+     #endif
+ 
+-    nonisolated deinit {
++    deinit {
+         if let observer {
+             NotificationCenter.default.removeObserver(observer)
+         }
