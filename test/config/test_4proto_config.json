@@ -1,0 +1,60 @@
+{
+  "log": {
+    "level": "trace"
+  },
+  "outbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-eh-node",
+      "server": "1.2.3.4",
+      "server_port": 443,
+      "uuid": "00112233-4455-6677-8899-aabbccddeeff",
+      "flow": "xtls-rprx-vision",
+      "e": true,
+      "h": "03aabbcc",
+      "tls": {
+        "enabled": true,
+        "server_name": "example.com",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": "x5F7y8mK9d5v3gQ9r1t6y7u8i9o0p1a2s3d4f5g6h7j",
+          "short_id": "0123456789abcdef"
+        },
+        "disable_x25519_mlkem768": true
+      }
+    },
+    {
+      "type": "onesocks",
+      "tag": "onesocks-node",
+      "server": "1.2.3.4",
+      "server_port": 8888,
+      "password": "secret-onesocks",
+      "cipher": "aes-128-ctr",
+      "padding_len": "10-30"
+    },
+    {
+      "type": "heysocks-xhttp",
+      "tag": "heysocks-xhttp-node",
+      "server": "1.2.3.4",
+      "server_port": 8889,
+      "password": "key-part:03010203",
+      "cipher": "aes-128-ctr"
+    },
+    {
+      "type": "shadowsocks",
+      "tag": "ss2022-blackstone-node",
+      "server": "1.2.3.4",
+      "server_port": 8388,
+      "method": "2022-blake3-aes-128-gcm",
+      "password": "MDEyMzQ1Njc4OWFiY2RlZg==:ZmVkY2JhOTg3NjU0MzIxMA==#BLACKSTONE"
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ]
+}

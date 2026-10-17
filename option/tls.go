@@ -133,6 +133,7 @@ type OutboundTLSOptions struct {
 	ECH                        *OutboundECHOptions                 `json:"ech,omitempty"`
 	UTLS                       *OutboundUTLSOptions                `json:"utls,omitempty"`
 	Reality                    *OutboundRealityOptions             `json:"reality,omitempty"`
+	DisableX25519MLKEM768      bool                                `json:"disable_x25519_mlkem768,omitempty"`
 }
 
 type OutboundTLSOptionsContainer struct {

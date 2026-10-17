@@ -45,6 +45,8 @@ type Outbound struct {
 	transport       adapter.V2RayClientTransport
 	packetAddr      bool
 	xudp            bool
+	heysocksClient  *HeySocksClient
+	rawUUID         [16]byte
 }
 
 func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.VLESSOutboundOptions) (adapter.Outbound, error) {
@@ -95,6 +97,17 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 	outbound.client, err = vless.NewClient(options.UUID, options.Flow, logger)
 	if err != nil {
 		return nil, err
+	}
+	rawUUID, err := parseUUID(options.UUID)
+	if err != nil {
+		return nil, err
+	}
+	outbound.rawUUID = rawUUID
+	if options.E || options.H != "" {
+		outbound.heysocksClient, err = NewHeySocksClient(options.E, options.H)
+		if err != nil {
+			return nil, err
+		}
 	}
 	outbound.multiplexDialer, err = mux.NewClientWithOptions((*vlessDialer)(outbound), logger, common.PtrValueOrDefault(options.Multiplex))
 	if err != nil {
@@ -201,6 +214,9 @@ func (h *vlessDialer) DialContext(ctx context.Context, network string, destinati
 	if err != nil {
 		return nil, err
 	}
+	if h.heysocksClient != nil {
+		conn = NewHeySocksConn(conn, h.heysocksClient, h.rawUUID)
+	}
 	switch N.NetworkName(network) {
 	case N.NetworkTCP:
 		h.logger.InfoContext(ctx, "outbound connection to ", destination)
@@ -243,6 +259,9 @@ func (h *vlessDialer) ListenPacket(ctx context.Context, destination M.Socksaddr)
 	if err != nil {
 		common.Close(conn)
 		return nil, err
+	}
+	if h.heysocksClient != nil {
+		conn = NewHeySocksConn(conn, h.heysocksClient, h.rawUUID)
 	}
 	if h.xudp {
 		return h.client.DialEarlyXUDPPacketConn(conn, destination)

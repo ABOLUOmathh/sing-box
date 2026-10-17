@@ -1,0 +1,31 @@
+diff --git a/ApplicationLibrary/Views/Setting/SettingView.swift b/ApplicationLibrary/Views/Setting/SettingView.swift
+index b16bbf1..689a5a1 100644
+--- a/ApplicationLibrary/Views/Setting/SettingView.swift
++++ b/ApplicationLibrary/Views/Setting/SettingView.swift
+@@ -200,11 +200,11 @@ public struct SettingView: View {
+                             Text("Configuration")
+                         }
+                     }
+-                    FormLink(destination: URL(string: String("https://github.com/SagerNet/sing-box"))!) {
++                    FormLink(destination: URL(string: String("https://github.com/ABOLUOmathh/sing-box"))!) {
+                         Label("Source Code", systemImage: "pills.fill")
+                     }
+                     .contextMenu {
+-                        Link(destination: URL(string: String("https://github.com/SagerNet/sing-box/releases"))!) {
++                        Link(destination: URL(string: String("https://github.com/ABOLUOmathh/sing-box/releases"))!) {
+                             Text("Releases")
+                         }
+                     }
+diff --git a/Library/Update/GitHubUpdateChecker.swift b/Library/Update/GitHubUpdateChecker.swift
+index 34652c6..e94ca15 100644
+--- a/Library/Update/GitHubUpdateChecker.swift
++++ b/Library/Update/GitHubUpdateChecker.swift
+@@ -3,7 +3,7 @@ import Foundation
+ import Libbox
+ 
+ public enum GitHubUpdateChecker {
+-    private static let releasesURL = "https://api.github.com/repos/SagerNet/sing-box/releases"
++    private static let releasesURL = "https://api.github.com/repos/ABOLUOmathh/sing-box/releases"
+     private static let minimumSemver = "0.0.0-0"
+ 
+     public static func checkAsync(track: UpdateTrack, githubToken: String = "", force: Bool = false) async throws -> UpdateInfo? {

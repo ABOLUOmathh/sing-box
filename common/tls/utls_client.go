@@ -39,6 +39,7 @@ type UTLSClientConfig struct {
 	recordFragment        bool
 	spoof                 string
 	spoofMethod           tlsspoof.Method
+	disableMLKEM          bool
 }
 
 func (c *UTLSClientConfig) ServerName() string {
@@ -90,7 +91,7 @@ func (c *UTLSClientConfig) Client(conn net.Conn) (Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &utlsALPNWrapper{utlsConnWrapper{utls.UClient(conn, c.config.Clone(), c.id)}, c.config.NextProtos}, nil
+	return &utlsALPNWrapper{utlsConnWrapper{utls.UClient(conn, c.config.Clone(), c.id)}, c.config.NextProtos, c.disableMLKEM}, nil
 }
 
 func (c *UTLSClientConfig) SetSessionIDGenerator(generator func(clientHello []byte, sessionID []byte) error) {
@@ -111,6 +112,7 @@ func (c *UTLSClientConfig) Clone() Config {
 		recordFragment:        c.recordFragment,
 		spoof:                 c.spoof,
 		spoofMethod:           c.spoofMethod,
+		disableMLKEM:          c.disableMLKEM,
 	}
 	cloned.SetServerName(cloned.serverName)
 	return cloned
@@ -162,22 +164,62 @@ func (c *utlsConnWrapper) WriterReplaceable() bool {
 type utlsALPNWrapper struct {
 	utlsConnWrapper
 	nextProtocols []string
+	disableMLKEM  bool
 }
 
 func (c *utlsALPNWrapper) HandshakeContext(ctx context.Context) error {
-	if len(c.nextProtocols) > 0 {
+	needRebuild := false
+	if len(c.nextProtocols) > 0 || c.disableMLKEM {
 		err := c.BuildHandshakeState()
 		if err != nil {
 			return err
 		}
-		for _, extension := range c.Extensions {
-			if alpnExtension, isALPN := extension.(*utls.ALPNExtension); isALPN {
-				alpnExtension.AlpnProtocols = c.nextProtocols
-				err = c.BuildHandshakeState()
-				if err != nil {
-					return err
+		if len(c.nextProtocols) > 0 {
+			for _, extension := range c.Extensions {
+				if alpnExtension, isALPN := extension.(*utls.ALPNExtension); isALPN {
+					alpnExtension.AlpnProtocols = c.nextProtocols
+					needRebuild = true
+					break
 				}
-				break
+			}
+		}
+		if c.disableMLKEM {
+			for _, extension := range c.Extensions {
+				if curvesExt, ok := extension.(*utls.SupportedCurvesExtension); ok {
+					var filteredCurves []utls.CurveID
+					hasMLKEM := false
+					for _, curve := range curvesExt.Curves {
+						if curve == utls.CurveID(option.X25519MLKEM768) {
+							hasMLKEM = true
+						} else {
+							filteredCurves = append(filteredCurves, curve)
+						}
+					}
+					if hasMLKEM {
+						curvesExt.Curves = filteredCurves
+						needRebuild = true
+					}
+				} else if keyShareExt, ok := extension.(*utls.KeyShareExtension); ok {
+					var filteredShares []utls.KeyShare
+					hasMLKEM := false
+					for _, share := range keyShareExt.KeyShares {
+						if share.Group == utls.CurveID(option.X25519MLKEM768) {
+							hasMLKEM = true
+						} else {
+							filteredShares = append(filteredShares, share)
+						}
+					}
+					if hasMLKEM {
+						keyShareExt.KeyShares = filteredShares
+						needRebuild = true
+					}
+				}
+			}
+		}
+		if needRebuild {
+			err = c.BuildHandshakeState()
+			if err != nil {
+				return err
 			}
 		}
 	}
@@ -245,6 +287,22 @@ func newUTLSClient(ctx context.Context, logger logger.ContextLogger, serverAddre
 				}
 			}
 			return nil, E.New("unknown cipher_suite: ", cipherSuite)
+		}
+	}
+	for _, curve := range options.CurvePreferences {
+		tlsConfig.CurvePreferences = append(tlsConfig.CurvePreferences, utls.CurveID(curve))
+	}
+	if options.DisableX25519MLKEM768 {
+		if len(tlsConfig.CurvePreferences) == 0 {
+			tlsConfig.CurvePreferences = []utls.CurveID{utls.X25519, utls.CurveP256, utls.CurveP384}
+		} else {
+			var filtered []utls.CurveID
+			for _, curve := range tlsConfig.CurvePreferences {
+				if curve != utls.CurveID(option.X25519MLKEM768) {
+					filtered = append(filtered, curve)
+				}
+			}
+			tlsConfig.CurvePreferences = filtered
 		}
 	}
 	var certificate []byte
@@ -320,6 +378,7 @@ func newUTLSClient(ctx context.Context, logger logger.ContextLogger, serverAddre
 		recordFragment:        options.RecordFragment,
 		spoof:                 spoof,
 		spoofMethod:           spoofMethod,
+		disableMLKEM:          options.DisableX25519MLKEM768 || (len(options.CurvePreferences) > 0 && !common.Contains(options.CurvePreferences, option.CurvePreference(option.X25519MLKEM768))),
 	}
 	config.SetServerName(serverName)
 	if options.ECH != nil && options.ECH.Enabled {

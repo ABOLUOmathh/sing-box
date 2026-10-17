@@ -175,6 +175,19 @@ func newSTDClient(ctx context.Context, logger logger.ContextLogger, serverAddres
 	for _, curve := range options.CurvePreferences {
 		tlsConfig.CurvePreferences = append(tlsConfig.CurvePreferences, tls.CurveID(curve))
 	}
+	if options.DisableX25519MLKEM768 {
+		if len(tlsConfig.CurvePreferences) == 0 {
+			tlsConfig.CurvePreferences = []tls.CurveID{tls.X25519, tls.CurveP256, tls.CurveP384}
+		} else {
+			var filtered []tls.CurveID
+			for _, curve := range tlsConfig.CurvePreferences {
+				if curve != tls.CurveID(option.X25519MLKEM768) {
+					filtered = append(filtered, curve)
+				}
+			}
+			tlsConfig.CurvePreferences = filtered
+		}
+	}
 	var certificate []byte
 	if len(options.Certificate) > 0 {
 		certificate = []byte(strings.Join(options.Certificate, "\n"))

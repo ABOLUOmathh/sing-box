@@ -1,0 +1,245 @@
+name: Custom Release (iOS TrollStore IPA & Core Binaries)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.14.3-hx.1)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    name: Build iOS TrollStore IPA & Libbox
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: false
+
+      - name: Install Apple build tools
+        run: |
+          brew install dpkg ldid
+          make lib_install
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+
+      - name: Determine Version
+        id: version_step
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+          else
+            TAG_NAME="v1.14.3-hx.1"
+          fi
+          VERSION="${TAG_NAME#v}"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Apply Apple customization patch
+        run: |
+          if [ -f .github/apple_custom.patch ]; then
+            echo "Applying apple_custom.patch..."
+            cd clients/apple
+            git apply ../../.github/apple_custom.patch || true
+            cd ../..
+          fi
+
+      - name: Build Libbox.xcframework (iOS 15.0+)
+        run: |
+          export PATH="$PATH:$HOME/go/bin"
+          go run ./cmd/internal/build_libbox -target apple -platform ios
+          rm -rf clients/apple/Libbox.xcframework
+          cp -R Libbox.xcframework clients/apple/Libbox.xcframework
+          mkdir -p ios-dist
+          zip -qry9 "ios-dist/Libbox.xcframework.zip" Libbox.xcframework
+
+      - name: Package iOS TrollStore & Sideload IPA
+        run: |
+          chmod +x .github/package_ipa.sh
+          .github/package_ipa.sh "${{ env.VERSION }}"
+          cp clients/apple/build/sing-box-*-ios-trollstore.ipa ios-dist/
+
+      - name: Build iOS Jailbreak Deb (Optional)
+        run: |
+          (make -C clients/apple build_ios_deb && cp clients/apple/build/jailbreak/*.deb ios-dist/) || echo "Jailbreak deb build skipped"
+
+      - name: Upload iOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-artifacts
+          path: ios-dist/*
+
+  build-cli:
+    name: Build CLI - ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: false
+
+      - name: Determine Version
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+          else
+            TAG_NAME="v1.14.3-hx.1"
+          fi
+          VERSION="${TAG_NAME#v}"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Compile sing-box binary
+        run: |
+          GOOS=${{ matrix.goos }}
+          GOARCH=${{ matrix.goarch }}
+          BINARY_NAME="sing-box"
+          if [ "$GOOS" = "windows" ]; then
+            BINARY_NAME="sing-box.exe"
+          fi
+          
+          CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -v -trimpath \
+            -tags "with_quic,with_wireguard,with_utls,with_clash_api,with_gvisor" \
+            -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${VERSION}' -s -w -buildid=" \
+            -o "$BINARY_NAME" ./cmd/sing-box
+
+          mkdir -p cli-dist
+          PACKAGE_BASE="sing-box-${VERSION}-${GOOS}-${GOARCH}"
+          if [ "$GOOS" = "windows" ]; then
+            zip -j "cli-dist/${PACKAGE_BASE}.zip" "$BINARY_NAME" LICENSE
+          else
+            tar -czvf "cli-dist/${PACKAGE_BASE}.tar.gz" "$BINARY_NAME" LICENSE
+          fi
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: cli-dist/*
+
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-ios, build-cli]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+          else
+            TAG_NAME="v1.14.3-hx.1"
+          fi
+          VERSION="${TAG_NAME#v}"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Download all built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Generate Checksums
+        run: |
+          cd release-artifacts
+          sha256sum * > sha256sums.txt
+          cat sha256sums.txt
+          cd ..
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: sing-box ${{ env.VERSION }} (Custom 4-Protocol & iOS Support)
+          draft: false
+          prerelease: false
+          files: release-artifacts/*
+          body: |
+            ## sing-box ${{ env.VERSION }} (Custom Release)
+
+            ### 🇨🇳 中文说明 (Chinese Description)
+            基于官方 sing-box **v1.14.3** 深度适配四大专有协议，优先实现 iOS 设备（支持 iOS 15.0+ 及 iOS 16.0+）免签与自签完整适配，兼顾跨平台核心客户端。
+
+            #### 🌟 核心特性与适配协议 (Supported Protocols)
+            1. **Enhanced VLESS (VLESS-EH)**
+               - 支持 REALITY + xtls-rprx-vision 流控。
+               - 内置 MD5 `e` 动态握手认证与服务端 `h` 令牌回写拦截更新。
+               - 智能检测并抑制 `X25519MLKEM768` (ID 4588) 后量子扩展，防止 REALITY 首包被阻断。
+            2. **OneSocks**
+               - 原生实现自定义 AES-CTR 流加密与 MD5 密钥推导 (KDF)。
+               - 包含 `MD5(password + "_onesocks")` 校验头与首包目的地址无缝写入。
+               - 完整支持 Native UDP 报文与 UOT (UDP over TCP) 隧道。
+            3. **HeySocks XHTTP**
+               - 专有 xstream 传输协议，AES-128-CTR 加密。
+               - 128 字节 fake-net bootstrap 引导帧握手。
+               - 完整支持 TCP / Native UDP / UOT。
+            4. **Shadowsocks 2022 (BLACKSTONE)**
+               - 兼容 `2022-blake3-aes-128-gcm`。
+               - 自动解析 `identityPSK:masterPSK#BLACKSTONE`。
+               - 挂载 27 字节 fixedPlain 附带 `MD5(base64(masterPSK))` 校验头，缺少显式 UDP 配置时自动启用 UOT。
+
+            #### 📱 iOS 设备安装说明 (iOS Installation Guide)
+            - **巨魔商店安装 (TrollStore, 推荐 iOS 15.0 - 16.6.1 / 17.0)**:
+              下载 `sing-box-${{ env.VERSION }}-ios-trollstore.ipa`，使用 TrollStore 直接打开安装，即可直接获得系统 NetworkExtension 完整 VPN 权限，免证书免续期。
+            - **个人 / 企业证书自签安装 (AltStore / SideStore / Sideloadly)**:
+              下载 `sing-box-${{ env.VERSION }}-ios-trollstore.ipa`，直接导入 AltStore / SideStore 进行重签名并安装即可。
+            - **越狱设备 (Jailbreak)**:
+              提供 `SFI-${{ env.VERSION }}-iphoneos-arm64.deb`，通过 Sileo / Zebra 安装。
+            - **开发者集成**:
+              提供包含 4 大协议适配的 `Libbox.xcframework.zip`。
+
+            #### 🔄 维护体系与定向优化
+            - **版本规范**: 遵循 `{官方版本}-hx.{自定义小版本}` 规范（如 `v1.14.3-hx.1`），代码模块高度解耦，便于后续随时合并官方更新。
+            - **关于界面与更新检查**: 客户端关于页面的源码链接与更新检测已完整重定向至本仓库 `https://github.com/ABOLUOmathh/sing-box`。
+
+            ---
+
+            ### 🇺🇸 English Description
+            Custom release of sing-box **v1.14.3** with native support for 4 custom protocols, tailored for iOS (TrollStore & Sideloading, iOS 15.0+) and cross-platform CLI.

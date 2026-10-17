@@ -11,6 +11,7 @@ import (
 	C "github.com/sagernet/sing-box/constant"
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
+	ss2022 "github.com/sagernet/sing-box/transport/heysocks/ss2022"
 	"github.com/sagernet/sing-box/transport/sip003"
 	"github.com/sagernet/sing-shadowsocks2"
 	"github.com/sagernet/sing/common"
@@ -34,32 +35,47 @@ var (
 
 type Outbound struct {
 	outbound.Adapter
-	logger          logger.ContextLogger
-	dialer          N.Dialer
-	method          shadowsocks.Method
-	serverAddr      M.Socksaddr
-	plugin          sip003.Plugin
-	uotClient       *uot.Client
-	multiplexDialer *mux.Client
+	logger           logger.ContextLogger
+	dialer           N.Dialer
+	method           shadowsocks.Method
+	blackstoneMethod *ss2022.Method
+	serverAddr       M.Socksaddr
+	plugin           sip003.Plugin
+	uotClient        *uot.Client
+	multiplexDialer  *mux.Client
 }
 
 func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextLogger, tag string, options option.ShadowsocksOutboundOptions) (adapter.Outbound, error) {
-	method, err := shadowsocks.CreateMethod(ctx, options.Method, shadowsocks.MethodOptions{
-		Password: options.Password,
-	})
+	normalizedPassword, isBlackstone, err := ss2022.NormalizePassword(options.Method, options.Password)
 	if err != nil {
 		return nil, err
+	}
+	var method shadowsocks.Method
+	var blackstoneMethod *ss2022.Method
+	if isBlackstone {
+		blackstoneMethod, err = ss2022.New(options.Method, normalizedPassword)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		method, err = shadowsocks.CreateMethod(ctx, options.Method, shadowsocks.MethodOptions{
+			Password: options.Password,
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 	outboundDialer, err := dialer.New(ctx, options.DialerOptions, options.ServerIsDomain())
 	if err != nil {
 		return nil, err
 	}
 	outbound := &Outbound{
-		Adapter:    outbound.NewAdapterWithDialerOptions(C.TypeShadowsocks, tag, options.Network.Build(), options.DialerOptions),
-		logger:     logger,
-		dialer:     outboundDialer,
-		method:     method,
-		serverAddr: options.ServerOptions.Build(),
+		Adapter:          outbound.NewAdapterWithDialerOptions(C.TypeShadowsocks, tag, options.Network.Build(), options.DialerOptions),
+		logger:           logger,
+		dialer:           outboundDialer,
+		method:           method,
+		blackstoneMethod: blackstoneMethod,
+		serverAddr:       options.ServerOptions.Build(),
 	}
 	if options.Plugin != "" {
 		outbound.plugin, err = sip003.CreatePlugin(ctx, options.Plugin, options.PluginOptions, router, outbound.dialer, outbound.serverAddr)
@@ -68,6 +84,9 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 		}
 	}
 	uotOptions := common.PtrValueOrDefault(options.UDPOverTCP)
+	if isBlackstone && options.UDPOverTCP == nil {
+		uotOptions.Enabled = true
+	}
 	if !uotOptions.Enabled {
 		outbound.multiplexDialer, err = mux.NewClientWithOptions((*shadowsocksDialer)(outbound), logger, common.PtrValueOrDefault(options.Multiplex))
 		if err != nil {
@@ -182,8 +201,14 @@ func (h *shadowsocksDialer) DialContext(ctx context.Context, network string, des
 		if err != nil {
 			return nil, err
 		}
+		if h.blackstoneMethod != nil {
+			return h.blackstoneMethod.DialEarlyConn(outConn, destination), nil
+		}
 		return h.method.DialEarlyConn(outConn, destination), nil
 	case N.NetworkUDP:
+		if h.blackstoneMethod != nil {
+			return nil, E.New("heysocks ss2022: native UDP is not supported; enable udp_over_tcp")
+		}
 		outConn, err := h.dialer.DialContext(ctx, N.NetworkUDP, h.serverAddr)
 		if err != nil {
 			return nil, err
@@ -195,6 +220,9 @@ func (h *shadowsocksDialer) DialContext(ctx context.Context, network string, des
 }
 
 func (h *shadowsocksDialer) ListenPacket(ctx context.Context, destination M.Socksaddr) (net.PacketConn, error) {
+	if h.blackstoneMethod != nil {
+		return nil, E.New("heysocks ss2022: native UDP is not supported; enable udp_over_tcp")
+	}
 	ctx, metadata := adapter.ExtendContext(ctx)
 	metadata.Outbound = h.Tag()
 	metadata.Destination = destination

@@ -43,6 +43,8 @@ const (
 	TypeHysteriaRealm      = "hysteria-realm"
 	TypeACME               = "acme"
 	TypeCloudflareOriginCA = "cloudflare-origin-ca"
+	TypeOneSocks           = "onesocks"
+	TypeHeySocksXHTTP      = "heysocks-xhttp"
 )
 
 const (
@@ -116,6 +118,10 @@ func ProxyDisplayName(proxyType string) string {
 		return "Selector"
 	case TypeURLTest:
 		return "URLTest"
+	case TypeOneSocks:
+		return "OneSocks"
+	case TypeHeySocksXHTTP:
+		return "HeySocks XHTTP"
 	default:
 		return "Unknown"
 	}
