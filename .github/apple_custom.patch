@@ -194,19 +194,32 @@ index 34652c6..e94ca15 100644
  
      public static func checkAsync(track: UpdateTrack, githubToken: String = "", force: Bool = false) async throws -> UpdateInfo? {
 diff --git a/SFI/MainView.swift b/SFI/MainView.swift
-index ae10d3e..8e0673b 100644
+index ae10d3e..22c66ab 100644
 --- a/SFI/MainView.swift
 +++ b/SFI/MainView.swift
-@@ -114,9 +114,6 @@ struct MainView: View {
-                         ToolbarItem(placement: .topBarLeading) {
-                             remoteControlPicker
-                         }
+@@ -110,16 +110,13 @@ struct MainView: View {
+             page.contentView
+                 .navigationTitle(page.title)
+                 .toolbar {
+-                    if remoteControlInToolbar, environments.remoteServer != nil || !remoteServers.isEmpty {
+-                        ToolbarItem(placement: .topBarLeading) {
+-                            remoteControlPicker
+-                        }
 -                        if #available(iOS 26.0, *) {
 -                            ToolbarSpacer(.fixed, placement: .topBarLeading)
 -                        }
-                     }
+-                    }
                      ToolbarItem(placement: .topBarLeading) {
-                         serviceToolbarItem
+-                        serviceToolbarItem
++                        HStack(spacing: 8) {
++                            if remoteControlInToolbar, environments.remoteServer != nil || !remoteServers.isEmpty {
++                                remoteControlPicker
++                            }
++                            serviceToolbarItem
++                        }
+                     }
+                 }
+         }
 @@ -314,11 +311,7 @@ struct MainView: View {
      private struct AccessoryPillBackgroundModifier: ViewModifier {
          let cornerRadius: CGFloat
