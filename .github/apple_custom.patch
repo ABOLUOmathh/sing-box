@@ -1,3 +1,111 @@
+diff --git a/ApplicationLibrary/Views/Abstract/TabViewBottomAccessoryCompat.swift b/ApplicationLibrary/Views/Abstract/TabViewBottomAccessoryCompat.swift
+index 9abee43..89fbb33 100644
+--- a/ApplicationLibrary/Views/Abstract/TabViewBottomAccessoryCompat.swift
++++ b/ApplicationLibrary/Views/Abstract/TabViewBottomAccessoryCompat.swift
+@@ -11,14 +11,8 @@ import SwiftUI
+             @ViewBuilder content: @escaping () -> some View
+         ) -> some View {
+             if isEnabled {
+-                if #available(iOS 26.0, *), useSystemAccessory {
+-                    tabViewBottomAccessory {
+-                        content()
+-                    }
+-                } else {
+-                    safeAreaInset(edge: .bottom, spacing: 0) {
+-                        TabViewBottomAccessoryContainer(content: content)
+-                    }
++                safeAreaInset(edge: .bottom, spacing: 0) {
++                    TabViewBottomAccessoryContainer(content: content)
+                 }
+             } else {
+                 self
+diff --git a/ApplicationLibrary/Views/Abstract/ViewModifiers.swift b/ApplicationLibrary/Views/Abstract/ViewModifiers.swift
+index 037d473..345202c 100644
+--- a/ApplicationLibrary/Views/Abstract/ViewModifiers.swift
++++ b/ApplicationLibrary/Views/Abstract/ViewModifiers.swift
+@@ -123,14 +123,9 @@ public extension View {
+         #if os(tvOS)
+             buttonStyle(ActionButtonStyle())
+         #else
+-            if #available(iOS 26.0, macOS 26.0, *) {
+-                frame(width: 44, height: 32)
+-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 8))
+-            } else {
+-                frame(width: 44, height: 32)
+-                    .background(Color.secondary.opacity(0.1))
+-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+-            }
++            frame(width: 44, height: 32)
++                .background(Color.secondary.opacity(0.1))
++                .clipShape(RoundedRectangle(cornerRadius: 8))
+         #endif
+     }
+ }
+@@ -192,14 +187,9 @@ private struct CardStyleModifier: ViewModifier {
+     @Environment(\.colorScheme) private var colorScheme
+ 
+     func body(content: Content) -> some View {
+-        if #available(iOS 26.0, macOS 26.0, tvOS 26.0, *) {
+-            content
+-                .glassEffect(.regular, in: .rect(cornerRadius: 16))
+-        } else {
+-            content
+-                .background(backgroundColor)
+-                .cornerRadius(16)
+-        }
++        content
++            .background(backgroundColor)
++            .cornerRadius(16)
+     }
+ 
+     private var backgroundColor: Color {
+diff --git a/ApplicationLibrary/Views/Dashboard/Cards/ProfileSelectorButton.swift b/ApplicationLibrary/Views/Dashboard/Cards/ProfileSelectorButton.swift
+index c2d5ac2..3624e88 100644
+--- a/ApplicationLibrary/Views/Dashboard/Cards/ProfileSelectorButton.swift
++++ b/ApplicationLibrary/Views/Dashboard/Cards/ProfileSelectorButton.swift
+@@ -80,13 +80,9 @@ struct ProfileSelectorButton: View {
+ extension View {
+     @ViewBuilder
+     func selectorBackground() -> some View {
+-        if #available(iOS 26.0, macOS 26.0, tvOS 26.0, *) {
+-            glassEffect(.regular.interactive(), in: .rect(cornerRadius: 12))
+-        } else {
+-            background(
+-                RoundedRectangle(cornerRadius: 12)
+-                    .fill(Color.secondary.opacity(0.1))
+-            )
+-        }
++        background(
++            RoundedRectangle(cornerRadius: 12)
++                .fill(Color.secondary.opacity(0.1))
++        )
+     }
+ }
+diff --git a/ApplicationLibrary/Views/Setting/GhosttyConfigurationView.swift b/ApplicationLibrary/Views/Setting/GhosttyConfigurationView.swift
+index 9b8969d..62954bb 100644
+--- a/ApplicationLibrary/Views/Setting/GhosttyConfigurationView.swift
++++ b/ApplicationLibrary/Views/Setting/GhosttyConfigurationView.swift
+@@ -2,6 +2,7 @@
+     import Library
+     import SwiftUI
+ 
++#if canImport(GhosttyTerminal)
+     public struct GhosttyConfigurationView: View {
+         private static let lightDefaultTheme = "Alabaster"
+         private static let darkDefaultTheme = "Afterglow"
+@@ -196,4 +197,12 @@
+             isLoading = false
+         }
+     }
++#else
++    public struct GhosttyConfigurationView: View {
++        public init() {}
++        public var body: some View {
++            Text("Ghostty Terminal is not available on this platform.")
++        }
++    }
++#endif
+ #endif
 diff --git a/ApplicationLibrary/Views/Setting/SettingView.swift b/ApplicationLibrary/Views/Setting/SettingView.swift
 index b16bbf1..689a5a1 100644
 --- a/ApplicationLibrary/Views/Setting/SettingView.swift
@@ -16,6 +124,62 @@ index b16bbf1..689a5a1 100644
                              Text("Releases")
                          }
                      }
+diff --git a/ApplicationLibrary/Views/Terminal/TerminalPresentation.swift b/ApplicationLibrary/Views/Terminal/TerminalPresentation.swift
+index ab9aae4..51c7aa5 100644
+--- a/ApplicationLibrary/Views/Terminal/TerminalPresentation.swift
++++ b/ApplicationLibrary/Views/Terminal/TerminalPresentation.swift
+@@ -8,22 +8,26 @@
+     extension View {
+         @ViewBuilder
+         func terminalPresentation(item session: Binding<TailscaleSSHPresentedSession?>) -> some View {
+-            #if os(iOS)
+-                if UIDevice.current.userInterfaceIdiom == .pad {
+-                    fullScreenCover(item: session) { presented in
+-                        NavigationStackCompat {
+-                            TerminalSessionContainerView(presented)
++            #if canImport(GhosttyTerminal)
++                #if os(iOS)
++                    if UIDevice.current.userInterfaceIdiom == .pad {
++                        fullScreenCover(item: session) { presented in
++                            NavigationStackCompat {
++                                TerminalSessionContainerView(presented)
++                            }
+                         }
+-                    }
+-                } else {
+-                    sheet(item: session) { presented in
+-                        NavigationStackCompat {
+-                            TerminalSessionContainerView(presented)
++                    } else {
++                        sheet(item: session) { presented in
++                            NavigationStackCompat {
++                                TerminalSessionContainerView(presented)
++                            }
+                         }
+                     }
+-                }
++                #else
++                    modifier(TerminalWindowPresentationModifier(session: session))
++                #endif
+             #else
+-                modifier(TerminalWindowPresentationModifier(session: session))
++                self
+             #endif
+         }
+     }
+diff --git a/Library/Network/ExtensionProfile.swift b/Library/Network/ExtensionProfile.swift
+index c0b3f90..3998a62 100644
+--- a/Library/Network/ExtensionProfile.swift
++++ b/Library/Network/ExtensionProfile.swift
+@@ -111,7 +111,7 @@ public class ExtensionProfile: ObservableObject {
+         }
+     #endif
+ 
+-    nonisolated deinit {
++    deinit {
+         if let observer {
+             NotificationCenter.default.removeObserver(observer)
+         }
 diff --git a/Library/Update/GitHubUpdateChecker.swift b/Library/Update/GitHubUpdateChecker.swift
 index 34652c6..e94ca15 100644
 --- a/Library/Update/GitHubUpdateChecker.swift
@@ -29,6 +193,46 @@ index 34652c6..e94ca15 100644
      private static let minimumSemver = "0.0.0-0"
  
      public static func checkAsync(track: UpdateTrack, githubToken: String = "", force: Bool = false) async throws -> UpdateInfo? {
+diff --git a/SFI/MainView.swift b/SFI/MainView.swift
+index ae10d3e..8e0673b 100644
+--- a/SFI/MainView.swift
++++ b/SFI/MainView.swift
+@@ -114,9 +114,6 @@ struct MainView: View {
+                         ToolbarItem(placement: .topBarLeading) {
+                             remoteControlPicker
+                         }
+-                        if #available(iOS 26.0, *) {
+-                            ToolbarSpacer(.fixed, placement: .topBarLeading)
+-                        }
+                     }
+                     ToolbarItem(placement: .topBarLeading) {
+                         serviceToolbarItem
+@@ -314,11 +311,7 @@ struct MainView: View {
+     private struct AccessoryPillBackgroundModifier: ViewModifier {
+         let cornerRadius: CGFloat
+         func body(content: Content) -> some View {
+-            if #available(iOS 26.0, *), !Variant.debugNoIOS26 {
+-                content.glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+-            } else {
+-                content.background(.bar, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+-            }
++            content.background(.bar, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+         }
+     }
+ 
+@@ -512,11 +505,7 @@ struct MainView: View {
+ 
+         private struct FABBackgroundModifier: ViewModifier {
+             func body(content: Content) -> some View {
+-                if #available(iOS 26.0, *), !Variant.debugNoIOS26 {
+-                    content.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+-                } else {
+-                    content.background(.bar, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+-                }
++                content.background(.bar, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+             }
+         }
+     }
 diff --git a/sing-box.xcodeproj/project.pbxproj b/sing-box.xcodeproj/project.pbxproj
 index 36d0bcb..6f1ce70 100644
 --- a/sing-box.xcodeproj/project.pbxproj
@@ -127,16 +331,3 @@ index 0abf72d..6012799 100644
      {
        "identity" : "networkimage",
        "kind" : "remoteSourceControl",
-diff --git a/Library/Network/ExtensionProfile.swift b/Library/Network/ExtensionProfile.swift
-index c0b3f90..3998a62 100644
---- a/Library/Network/ExtensionProfile.swift
-+++ b/Library/Network/ExtensionProfile.swift
-@@ -111,7 +111,7 @@ public class ExtensionProfile: ObservableObject {
-         }
-     #endif
- 
--    nonisolated deinit {
-+    deinit {
-         if let observer {
-             NotificationCenter.default.removeObserver(observer)
-         }
