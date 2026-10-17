@@ -366,3 +366,16 @@ index 36d0bcb..34d411b 100644
  				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
  				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
  				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+diff --git a/Library/Shared/FilePath.swift b/Library/Shared/FilePath.swift
+index fbd9e3e..29d1884 100644
+--- a/Library/Shared/FilePath.swift
++++ b/Library/Shared/FilePath.swift
+@@ -5,6 +5,8 @@ public enum FilePath {
+     public static let groupName = AppConfiguration.appGroupID
+ 
+     private static let defaultSharedDirectory: URL! = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupName)
++        ?? FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.io.nekohasekai.sfa")
++        ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+ 
+     #if os(iOS)
+         public static let sharedDirectory = defaultSharedDirectory!

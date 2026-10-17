@@ -95,9 +95,17 @@ if [[ -x /usr/libexec/PlistBuddy ]]; then
     for appex in "$APP_DEST/PlugIns"/*.appex; do
       if [[ -d "$appex" ]]; then
         appex_name="$(basename "$appex" .appex)"
+        case "$appex_name" in
+          Extension) ext_suffix="extension" ;;
+          WidgetExtension) ext_suffix="widget" ;;
+          ShareExtension) ext_suffix="share" ;;
+          FileProviderExtension) ext_suffix="fileprovider" ;;
+          IntentsExtension) ext_suffix="intents" ;;
+          *) ext_suffix="$(echo "$appex_name" | tr '[:upper:]' '[:lower:]')" ;;
+        esac
         /usr/libexec/PlistBuddy -c "Set :BasePackageIdentifier ${APP_ID}" "$appex/Info.plist" 2>/dev/null || true
         /usr/libexec/PlistBuddy -c "Set :AppGroupIdentifier ${APP_GROUP}" "$appex/Info.plist" 2>/dev/null || true
-        /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${APP_ID}.${appex_name}" "$appex/Info.plist" 2>/dev/null || true
+        /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${APP_ID}.${ext_suffix}" "$appex/Info.plist" 2>/dev/null || true
       fi
     done
   fi
@@ -117,6 +125,7 @@ cat <<EOF > "$STAGE_DIR/App.entitlements"
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>${APP_GROUP}</string>
+		<string>group.io.nekohasekai.sfa</string>
 	</array>
 	<key>get-task-allow</key>
 	<false/>
@@ -140,6 +149,7 @@ cat <<EOF > "$STAGE_DIR/Extension.entitlements"
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>${APP_GROUP}</string>
+		<string>group.io.nekohasekai.sfa</string>
 	</array>
 	<key>get-task-allow</key>
 	<false/>
@@ -155,6 +165,7 @@ cat <<EOF > "$STAGE_DIR/GenericExtension.entitlements"
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>${APP_GROUP}</string>
+		<string>group.io.nekohasekai.sfa</string>
 	</array>
 	<key>get-task-allow</key>
 	<false/>
