@@ -49,6 +49,7 @@ xcodebuild build \
   -derivedDataPath "$DERIVED_DATA" \
   -skipPackagePluginValidation \
   -skipMacroValidation \
+  BASE_PACKAGE_IDENTIFIER="io.nekohasekai.sfa" \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY="" \
@@ -72,43 +73,153 @@ echo "==> Staging sing-box.app into Payload directory..."
 cp -R "$APP_SRC" "$STAGE_DIR/Payload/sing-box.app"
 APP_DEST="$STAGE_DIR/Payload/sing-box.app"
 
-# Clean up signatures and provisioning profiles
-rm -rf "$APP_DEST/SC_Info" "$APP_DEST/_CodeSignature" "$APP_DEST/embedded.mobileprovision"
+# Clean up stale signatures and provisioning profiles
+rm -rf "$APP_DEST/SC_Info" "$APP_DEST/_CodeSignature" "$APP_DEST/embedded.mobileprovision" "$APP_DEST/Export.plist"
 find "$APP_DEST" -name '.DS_Store' -delete
 
-# Sign entitlements with ldid if available
-if command -v ldid >/dev/null 2>&1; then
-  echo "==> Signing binaries with ldid and native entitlements..."
-  MAIN_BIN="$APP_DEST/sing-box"
-  if [[ ! -f "$MAIN_BIN" ]]; then
-    MAIN_BIN="$(find "$APP_DEST" -maxdepth 1 -type f -perm +111 2>/dev/null | head -n 1)"
-  fi
-  if [[ -f "$APPLE_ROOT/SFI/SFI.entitlements" && -n "$MAIN_BIN" && -f "$MAIN_BIN" ]]; then
-    ldid -S"$APPLE_ROOT/SFI/SFI.entitlements" "$MAIN_BIN"
-  elif [[ -n "$MAIN_BIN" && -f "$MAIN_BIN" ]]; then
-    ldid -S "$MAIN_BIN"
-  fi
+APP_ID="io.nekohasekai.sfa"
+APP_GROUP="group.io.nekohasekai.sfa"
 
-  if [[ -d "$APP_DEST/PlugIns" ]]; then
-    for appex in "$APP_DEST/PlugIns"/*.appex; do
-      if [[ -d "$appex" ]]; then
-        appex_name="$(basename "$appex" .appex)"
-        ent_file="$APPLE_ROOT/$appex_name/$appex_name.entitlements"
-        bin_file="$appex/$appex_name"
-        if [[ -f "$bin_file" ]]; then
-          if [[ -f "$ent_file" ]]; then
-            echo "    Signing extension $appex_name with $ent_file"
-            ldid -S"$ent_file" "$bin_file"
-          else
-            ldid -S "$bin_file"
-          fi
+# Expand Info.plist variables if PlistBuddy is present
+if [[ -x /usr/libexec/PlistBuddy ]]; then
+  /usr/libexec/PlistBuddy -c "Set :BasePackageIdentifier ${APP_ID}" "$APP_DEST/Info.plist" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Set :AppGroupIdentifier ${APP_GROUP}" "$APP_DEST/Info.plist" 2>/dev/null || true
+fi
+
+# Generate concrete, verified entitlements XML without unresolved build variables
+
+cat <<EOF > "$STAGE_DIR/App.entitlements"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.networking.networkextension</key>
+	<array>
+		<string>packet-tunnel-provider</string>
+	</array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>${APP_GROUP}</string>
+	</array>
+	<key>get-task-allow</key>
+	<false/>
+</dict>
+</plist>
+EOF
+
+cat <<EOF > "$STAGE_DIR/Extension.entitlements"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.networking.networkextension</key>
+	<array>
+		<string>packet-tunnel-provider</string>
+	</array>
+	<key>com.apple.developer.networking.wifi-info</key>
+	<true/>
+	<key>com.apple.developer.networking.multicast</key>
+	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>${APP_GROUP}</string>
+	</array>
+	<key>get-task-allow</key>
+	<false/>
+</dict>
+</plist>
+EOF
+
+cat <<EOF > "$STAGE_DIR/GenericExtension.entitlements"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>${APP_GROUP}</string>
+	</array>
+	<key>get-task-allow</key>
+	<false/>
+</dict>
+</plist>
+EOF
+
+echo "==> Signing all Mach-O binaries in Frameworks and subdirectories..."
+# Sign all frameworks directly
+if [[ -d "$APP_DEST/Frameworks" ]]; then
+  for fw in "$APP_DEST/Frameworks"/*; do
+    if [[ -d "$fw" && "$fw" =~ \.framework$ ]]; then
+      fw_name="$(basename "$fw" .framework)"
+      fw_bin="$fw/$fw_name"
+      if [[ -f "$fw_bin" ]]; then
+        echo "    Signing framework: $fw_name"
+        command -v ldid >/dev/null 2>&1 && ldid -S "$fw_bin"
+        command -v codesign >/dev/null 2>&1 && codesign -f -s - "$fw" 2>/dev/null || true
+      fi
+    elif [[ -f "$fw" && "$fw" =~ \.dylib$ ]]; then
+      echo "    Signing dylib: $(basename "$fw")"
+      command -v ldid >/dev/null 2>&1 && ldid -S "$fw"
+      command -v codesign >/dev/null 2>&1 && codesign -f -s - "$fw" 2>/dev/null || true
+    fi
+  done
+fi
+
+# Find and sign any other Mach-O files (dylibs, helper binaries)
+while IFS= read -r macho; do
+  [[ -z "$macho" ]] && continue
+  if [[ "$macho" == "$APP_DEST/sing-box" ]]; then continue; fi
+  if [[ "$macho" =~ \.appex/ ]]; then continue; fi
+  if file -b "$macho" | grep -q "Mach-O"; then
+    echo "    Ad-hoc signing: $(basename "$macho")"
+    command -v ldid >/dev/null 2>&1 && ldid -S "$macho"
+    command -v codesign >/dev/null 2>&1 && codesign -f -s - "$macho" 2>/dev/null || true
+  fi
+done < <(find "$APP_DEST" -type f)
+
+# Sign Extensions with concrete entitlements
+if [[ -d "$APP_DEST/PlugIns" ]]; then
+  for appex in "$APP_DEST/PlugIns"/*.appex; do
+    if [[ -d "$appex" ]]; then
+      appex_name="$(basename "$appex" .appex)"
+      bin_file="$appex/$appex_name"
+      if [[ -f "$bin_file" ]]; then
+        # Sign any frameworks inside extension
+        if [[ -d "$appex/Frameworks" ]]; then
+          for efw in "$appex/Frameworks"/*; do
+            if [[ -d "$efw" && "$efw" =~ \.framework$ ]]; then
+              efw_bin="$efw/$(basename "$efw" .framework)"
+              [[ -f "$efw_bin" ]] && command -v ldid >/dev/null 2>&1 && ldid -S "$efw_bin"
+              command -v codesign >/dev/null 2>&1 && codesign -f -s - "$efw" 2>/dev/null || true
+            fi
+          done
+        fi
+        if [[ "$appex_name" == "Extension" ]]; then
+          echo "    Signing Extension with Extension.entitlements"
+          command -v ldid >/dev/null 2>&1 && ldid -S"$STAGE_DIR/Extension.entitlements" "$bin_file"
+          command -v codesign >/dev/null 2>&1 && codesign -f -s - --entitlements "$STAGE_DIR/Extension.entitlements" "$appex" 2>/dev/null || true
+        else
+          echo "    Signing $appex_name with GenericExtension.entitlements"
+          command -v ldid >/dev/null 2>&1 && ldid -S"$STAGE_DIR/GenericExtension.entitlements" "$bin_file"
+          command -v codesign >/dev/null 2>&1 && codesign -f -s - --entitlements "$STAGE_DIR/GenericExtension.entitlements" "$appex" 2>/dev/null || true
         fi
       fi
-    done
-  fi
-elif command -v codesign >/dev/null 2>&1; then
-  echo "==> Signing with ad-hoc codesign..."
-  codesign --force --deep -s - "$APP_DEST" || true
+    fi
+  done
+fi
+
+# Sign Main Executable with concrete App.entitlements
+MAIN_BIN="$APP_DEST/sing-box"
+if [[ ! -f "$MAIN_BIN" ]]; then
+  MAIN_BIN="$(find "$APP_DEST" -maxdepth 1 -type f | while read -r f; do file -b "$f" | grep -q "Mach-O" && echo "$f" && break; done)"
+fi
+echo "==> Signing main executable with App.entitlements: $(basename "$MAIN_BIN")"
+command -v ldid >/dev/null 2>&1 && ldid -S"$STAGE_DIR/App.entitlements" "$MAIN_BIN"
+
+# Final deep codesign pass
+if command -v codesign >/dev/null 2>&1; then
+  echo "==> Applying final deep signature with codesign..."
+  codesign --force --deep -s - --entitlements "$STAGE_DIR/App.entitlements" "$APP_DEST" 2>/dev/null || true
 fi
 
 OUTPUT_DIR="$APPLE_ROOT/build"
