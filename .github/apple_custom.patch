@@ -344,3 +344,25 @@ index 0abf72d..6012799 100644
      {
        "identity" : "networkimage",
        "kind" : "remoteSourceControl",
+diff --git a/sing-box.xcodeproj/project.pbxproj b/sing-box.xcodeproj/project.pbxproj
+index 36d0bcb..34d411b 100644
+--- a/sing-box.xcodeproj/project.pbxproj
++++ b/sing-box.xcodeproj/project.pbxproj
+@@ -3103,7 +3103,7 @@
+ 				ENABLE_PREVIEWS = YES;
+ 				GENERATE_INFOPLIST_FILE = YES;
+ 				INFOPLIST_FILE = SFI/Info.plist;
+-				INFOPLIST_KEY_CFBundleDisplayName = "sing-box";
++				INFOPLIST_KEY_CFBundleDisplayName = "sing-boxHX";
+ 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+ 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+ 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+@@ -3146,7 +3146,7 @@
+ 				ENABLE_PREVIEWS = YES;
+ 				GENERATE_INFOPLIST_FILE = YES;
+ 				INFOPLIST_FILE = SFI/Info.plist;
+-				INFOPLIST_KEY_CFBundleDisplayName = "sing-box";
++				INFOPLIST_KEY_CFBundleDisplayName = "sing-boxHX";
+ 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+ 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+ 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;

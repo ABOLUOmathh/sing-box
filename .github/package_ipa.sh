@@ -49,7 +49,9 @@ xcodebuild build \
   -derivedDataPath "$DERIVED_DATA" \
   -skipPackagePluginValidation \
   -skipMacroValidation \
-  BASE_PACKAGE_IDENTIFIER="io.nekohasekai.sfa" \
+  BASE_PACKAGE_IDENTIFIER="io.nekohasekai.sfa.hx" \
+  APP_GROUP_IDENTIFIER="group.io.nekohasekai.sfa.hx" \
+  INFOPLIST_KEY_CFBundleDisplayName="sing-boxHX" \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY="" \
@@ -77,13 +79,28 @@ APP_DEST="$STAGE_DIR/Payload/sing-box.app"
 rm -rf "$APP_DEST/SC_Info" "$APP_DEST/_CodeSignature" "$APP_DEST/embedded.mobileprovision" "$APP_DEST/Export.plist"
 find "$APP_DEST" -name '.DS_Store' -delete
 
-APP_ID="io.nekohasekai.sfa"
-APP_GROUP="group.io.nekohasekai.sfa"
+APP_ID="io.nekohasekai.sfa.hx"
+APP_GROUP="group.io.nekohasekai.sfa.hx"
+APP_DISPLAY_NAME="sing-boxHX"
 
 # Expand Info.plist variables if PlistBuddy is present
 if [[ -x /usr/libexec/PlistBuddy ]]; then
   /usr/libexec/PlistBuddy -c "Set :BasePackageIdentifier ${APP_ID}" "$APP_DEST/Info.plist" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c "Set :AppGroupIdentifier ${APP_GROUP}" "$APP_DEST/Info.plist" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${APP_DISPLAY_NAME}" "$APP_DEST/Info.plist" 2>/dev/null || \
+  /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string ${APP_DISPLAY_NAME}" "$APP_DEST/Info.plist" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Set :CFBundleName ${APP_DISPLAY_NAME}" "$APP_DEST/Info.plist" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${APP_ID}" "$APP_DEST/Info.plist" 2>/dev/null || true
+  if [[ -d "$APP_DEST/PlugIns" ]]; then
+    for appex in "$APP_DEST/PlugIns"/*.appex; do
+      if [[ -d "$appex" ]]; then
+        appex_name="$(basename "$appex" .appex)"
+        /usr/libexec/PlistBuddy -c "Set :BasePackageIdentifier ${APP_ID}" "$appex/Info.plist" 2>/dev/null || true
+        /usr/libexec/PlistBuddy -c "Set :AppGroupIdentifier ${APP_GROUP}" "$appex/Info.plist" 2>/dev/null || true
+        /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${APP_ID}.${appex_name}" "$appex/Info.plist" 2>/dev/null || true
+      fi
+    done
+  fi
 fi
 
 # Generate concrete, verified entitlements XML without unresolved build variables
