@@ -737,7 +737,11 @@ func (s *StartedService) URLTest(ctx context.Context, request *URLTestRequest) (
 		go group.URLTestOutbounds(boxService.ctx, boxService.outboundManager, historyStorage, boxService.logFactory.Logger(), outbounds, "http://www.gstatic.com/generate_204", 0, true)
 	} else {
 		go func() {
-			t, err := urltest.URLTest(boxService.ctx, "http://www.gstatic.com/generate_204", outbound)
+			testLink := "http://www.gstatic.com/generate_204"
+			if outbound.Type() == C.TypeDirect || outbound.Tag() == "DIRECT" || outbound.Tag() == "direct" {
+				testLink = "http://www.baidu.com"
+			}
+			t, err := urltest.URLTest(boxService.ctx, testLink, outbound)
 			if err != nil {
 				historyStorage.DeleteURLTestHistory(outboundTag)
 			} else {

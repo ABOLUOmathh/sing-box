@@ -469,7 +469,11 @@ func (b *urlTestBatch) test(outbounds []adapter.Outbound, link string, interval 
 				defer cancel()
 				testChan := make(chan urlTestResult, 1)
 				go func() {
-					delay, testErr := urltest.URLTest(testCtx, link, detour)
+					testLink := link
+					if detour.Type() == C.TypeDirect || detour.Tag() == "DIRECT" || detour.Tag() == "direct" {
+						testLink = "http://www.baidu.com"
+					}
+					delay, testErr := urltest.URLTest(testCtx, testLink, detour)
 					testChan <- urlTestResult{delay, testErr}
 				}()
 				var testResult urlTestResult

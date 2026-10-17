@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -96,6 +97,11 @@ func URLTest(ctx context.Context, link string, detour N.Dialer) (uint16, error) 
 }
 
 func urlTest(ctx context.Context, link string, detour N.Dialer) (t uint16, err error) {
+	if outbound, ok := detour.(adapter.Outbound); ok {
+		if outbound.Type() == C.TypeDirect || strings.EqualFold(outbound.Tag(), "direct") {
+			link = "http://www.baidu.com"
+		}
+	}
 	if link == "" {
 		link = "http://www.gstatic.com/generate_204"
 	}
