@@ -164,7 +164,7 @@ func buildAndroid() {
 	bindTarget := getAndroidBindTarget()
 
 	// Build main variant (SDK 24)
-	mainTags := append([]string{}, sharedTags...)
+	mainTags := filterTags(sharedTags, "with_naive_outbound")
 	// mainTags = append(mainTags, memcTags...)
 	if debugEnabled {
 		mainTags = append(mainTags, debugTags...)
