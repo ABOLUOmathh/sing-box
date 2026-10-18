@@ -60,7 +60,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.10"
+            TAG_NAME="v1.14.3-hx.11"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -150,7 +150,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.10"
+            TAG_NAME="v1.14.3-hx.11"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -196,7 +196,7 @@ jobs:
           GO_VERSION=go1.23
           EOF
 
-          # 4. Apply custom package name & app name for coexistence
+          # 4. Apply custom package name, app name, update check redirection & silent update prompt
           python3 -c '
           import glob
 
@@ -223,7 +223,44 @@ jobs:
               with open(s_file, "w") as f:
                   f.write(data)
 
-          print("Successfully applied custom package name io.nekohasekai.sfa.hx and app_name sing-boxHX")
+          # Redirect update check URL to ABOLUOmathh/sing-box releases
+          checker_kt = "clients/android/app/src/github/java/io/nekohasekai/sfa/vendor/GitHubUpdateChecker.kt"
+          with open(checker_kt, "r") as f:
+              c_data = f.read()
+          c_data = c_data.replace(
+              "https://api.github.com/repos/SagerNet/sing-box/releases",
+              "https://api.github.com/repos/ABOLUOmathh/sing-box/releases"
+          )
+          c_data = c_data.replace(
+              "asset.name.endsWith(\".apk\") &&",
+              "asset.name.endsWith(\".apk\") && (asset.name.contains(\"sing-boxHX\") || asset.name.contains(\"SFA\")) &&"
+          )
+          with open(checker_kt, "w") as f:
+              f.write(c_data)
+
+          # Redirect About / Source Repository URL
+          settings_screen = "clients/android/app/src/main/java/io/nekohasekai/sfa/compose/screen/settings/SettingsScreen.kt"
+          with open(settings_screen, "r") as f:
+              s_data = f.read()
+          s_data = s_data.replace(
+              "https://github.com/SagerNet/sing-box-for-android",
+              "https://github.com/ABOLUOmathh/sing-box"
+          )
+          with open(settings_screen, "w") as f:
+              f.write(s_data)
+
+          # Default updateCheckPrompted to true so it does not pop up asking user on launch
+          settings_kt = "clients/android/app/src/main/java/io/nekohasekai/sfa/database/Settings.kt"
+          with open(settings_kt, "r") as f:
+              st_data = f.read()
+          st_data = st_data.replace(
+              "var updateCheckPrompted by dataStore.boolean(SettingsKey.UPDATE_CHECK_PROMPTED) { false }",
+              "var updateCheckPrompted by dataStore.boolean(SettingsKey.UPDATE_CHECK_PROMPTED) { true }"
+          )
+          with open(settings_kt, "w") as f:
+              f.write(st_data)
+
+          print("Successfully configured Android package name, update redirection to ABOLUOmathh/sing-box, and silent prompt")
           '
 
       - name: Setup Gradle
@@ -246,6 +283,12 @@ jobs:
             cp "$apk" "$ROOT_DIR/android-dist/$clean_name"
           done
           cd "$ROOT_DIR"
+          cat > "$ROOT_DIR/android-dist/SFA-version-metadata.json" << EOF
+          {
+            "version_code": 744,
+            "version_name": "${VERSION}"
+          }
+          EOF
           ls -la android-dist/
 
       - name: Upload Android artifacts
@@ -261,24 +304,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Linux 主流架构 (含 .deb / .rpm)
-          - { goos: linux, goarch: amd64, deb: amd64, rpm: x86_64, openwrt: x86_64 }
-          - { goos: linux, goarch: arm64, deb: arm64, rpm: aarch64, openwrt: aarch64_generic }
-          - { goos: linux, goarch: "386", deb: i386, rpm: i386 }
-          - { goos: linux, goarch: arm, goarm: "7", deb: armhf, rpm: armv7hl, name_suffix: "armv7" }
-          - { goos: linux, goarch: arm, goarm: "6", deb: armel, rpm: armv6hl, name_suffix: "armv6" }
-          - { goos: linux, goarch: arm, goarm: "5", name_suffix: "armv5" }
+          # Linux 主流架构 (含 .deb / .rpm / .pkg.tar.zst / OpenWrt / Alpine)
+          - { goos: linux, goarch: amd64, deb: amd64, rpm: x86_64, pacman: x86_64, alpine: x86_64, openwrt: "x86_64" }
+          - { goos: linux, goarch: arm64, deb: arm64, rpm: aarch64, pacman: aarch64, alpine: aarch64, openwrt: "aarch64_cortex-a53 aarch64_cortex-a72 aarch64_cortex-a76 aarch64_generic" }
+          - { goos: linux, goarch: "386", deb: i386, rpm: i386, alpine: x86, openwrt: "i386_pentium4" }
+          - { goos: linux, goarch: arm, goarm: "7", deb: armhf, rpm: armv7hl, pacman: armv7hl, alpine: armv7, name_suffix: "armv7", openwrt: "arm_cortex-a5_vfpv4 arm_cortex-a7_neon-vfpv4 arm_cortex-a7_vfpv4 arm_cortex-a8_vfpv3 arm_cortex-a9_neon arm_cortex-a9_vfpv3-d16 arm_cortex-a15_neon-vfpv4" }
+          - { goos: linux, goarch: arm, goarm: "6", deb: armel, rpm: armv6hl, name_suffix: "armv6", openwrt: "arm_arm1176jzf-s_vfp" }
+          - { goos: linux, goarch: arm, goarm: "5", name_suffix: "armv5", openwrt: "arm_arm926ej-s arm_cortex-a7 arm_cortex-a9 arm_fa526 arm_xscale" }
 
-          # Linux 路由器芯片 (MIPS 架构，含 OpenWrt .ipk)
-          - { goos: linux, goarch: mipsle, gomips: softfloat, deb: mipsel, rpm: mipsel, openwrt: mipsel_24kc, name_suffix: "mipsle-softfloat" }
-          - { goos: linux, goarch: mipsle, gomips: hardfloat, name_suffix: "mipsle-hardfloat" }
-          - { goos: linux, goarch: mips, gomips: softfloat, openwrt: mips_24kc, name_suffix: "mips-softfloat" }
-          - { goos: linux, goarch: mips64, gomips: softfloat, name_suffix: "mips64" }
-          - { goos: linux, goarch: mips64le, gomips: hardfloat, name_suffix: "mips64le" }
+          # Linux 路由器芯片 (MIPS 架构，含 OpenWrt 全微架构)
+          - { goos: linux, goarch: mipsle, gomips: softfloat, deb: mipsel, rpm: mipsel, name_suffix: "mipsle-softfloat", openwrt: "mipsel_24kc mipsel_74kc mipsel_mips32" }
+          - { goos: linux, goarch: mipsle, gomips: hardfloat, name_suffix: "mipsle-hardfloat", openwrt: "mipsel_24kc_24kf" }
+          - { goos: linux, goarch: mips, gomips: softfloat, name_suffix: "mips-softfloat", openwrt: "mips_24kc mips_4kec mips_mips32" }
+          - { goos: linux, goarch: mips64, gomips: softfloat, name_suffix: "mips64", openwrt: "mips64_mips64r2 mips64_octeonplus" }
+          - { goos: linux, goarch: mips64le, gomips: hardfloat, name_suffix: "mips64le", openwrt: "mips64el_mips64r2" }
 
           # Linux 极客与新兴硬件
-          - { goos: linux, goarch: riscv64, deb: riscv64, rpm: riscv64 }
-          - { goos: linux, goarch: loong64, deb: loongarch64, rpm: loongarch64 }
+          - { goos: linux, goarch: riscv64, deb: riscv64, rpm: riscv64, alpine: riscv64, openwrt: "riscv64_generic" }
+          - { goos: linux, goarch: loong64, deb: loongarch64, rpm: loongarch64, alpine: loongarch64, openwrt: "loongarch64_generic" }
           - { goos: linux, goarch: s390x, deb: s390x, rpm: s390x }
           - { goos: linux, goarch: ppc64le, deb: ppc64el, rpm: ppc64le }
 
@@ -298,6 +341,12 @@ jobs:
           - { goos: freebsd, goarch: arm, goarm: "7", name_suffix: "armv7" }
           - { goos: openbsd, goarch: amd64 }
           - { goos: openbsd, goarch: arm64 }
+
+          # Android CLI 裸内核 (用于 Termux / Android 终端)
+          - { goos: android, goarch: arm64 }
+          - { goos: android, goarch: arm, goarm: "7", name_suffix: "arm" }
+          - { goos: android, goarch: amd64 }
+          - { goos: android, goarch: "386" }
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -317,7 +366,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.10"
+            TAG_NAME="v1.14.3-hx.11"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -354,10 +403,17 @@ jobs:
             tar -czvf "core-dist/${PACKAGE_BASE}.tar.gz" "$BINARY_NAME" LICENSE
           fi
 
-      - name: Package DEB / RPM / IPK (if applicable)
-        if: matrix.deb != '' || matrix.rpm != '' || matrix.openwrt != ''
+      - name: Package DEB / RPM / IPK / APK / Pacman (if applicable)
+        if: matrix.deb != '' || matrix.rpm != '' || matrix.openwrt != '' || matrix.pacman != '' || matrix.alpine != ''
         run: |
           sudo gem install --no-document fpm
+          sudo apt-get update && sudo apt-get install -y libarchive-tools || true
+
+          # Setup apk-tools for OpenWrt APK & Alpine APK
+          if [ -n "${{ matrix.openwrt }}" ] || [ -n "${{ matrix.alpine }}" ]; then
+            docker run --rm -v /usr/local/bin:/mnt alpine:edge sh -c "apk add --no-cache apk-tools-static && cp /sbin/apk.static /mnt/apk && chmod +x /mnt/apk" || true
+          fi
+
           mkdir -p dist
           cp sing-box dist/
           PKG_VERSION="${VERSION}"
@@ -383,7 +439,17 @@ jobs:
               dist/sing-box=/usr/bin/sing-box
           fi
 
-          # Package OpenWrt IPK
+          # Package Pacman (Arch Linux)
+          if [ -n "${{ matrix.pacman }}" ]; then
+            cp .fpm_pacman .fpm 2>/dev/null || true
+            fpm -t pacman \
+              -v "$PKG_VERSION" \
+              -p "core-dist/sing-box_${VERSION}_linux_${{ matrix.pacman }}.pkg.tar.zst" \
+              --architecture "${{ matrix.pacman }}" \
+              dist/sing-box=/usr/bin/sing-box || true
+          fi
+
+          # Package OpenWrt IPK & APK
           if [ -n "${{ matrix.openwrt }}" ]; then
             cp .fpm_openwrt .fpm
             fpm -t deb \
@@ -394,8 +460,18 @@ jobs:
             for arch in ${{ matrix.openwrt }}; do
               chmod +x .github/deb2ipk.sh
               .github/deb2ipk.sh "$arch" "dist/openwrt.deb" "core-dist/sing-box_${VERSION}_openwrt_${arch}.ipk"
+              if [ -x /usr/local/bin/apk ]; then
+                chmod +x .github/build_openwrt_apk.sh
+                .github/build_openwrt_apk.sh "$arch" "$VERSION" "dist/sing-box" "core-dist/sing-box_${VERSION}_openwrt_${arch}.apk" || true
+              fi
             done
             rm -f "dist/openwrt.deb"
+          fi
+
+          # Package Alpine APK
+          if [ -n "${{ matrix.alpine }}" ] && [ -x /usr/local/bin/apk ]; then
+            chmod +x .github/build_alpine_apk.sh
+            .github/build_alpine_apk.sh "${{ matrix.alpine }}" "$VERSION" "dist/sing-box" "core-dist/sing-box_${VERSION}_linux_${{ matrix.alpine }}.apk" || true
           fi
 
       - name: Upload Core artifact
@@ -420,7 +496,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.10"
+            TAG_NAME="v1.14.3-hx.11"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -451,16 +527,18 @@ jobs:
             ## sing-boxHX ${{ env.VERSION }} (Full-Matrix Release with Custom Branding)
 
             ### 🇨🇳 中文说明 (Chinese Description)
-            基于官方 sing-box **v1.14.3** 深度适配四大专有协议，对齐官方标准实现 **全平台、全架构全量构建**（涵盖 iOS TrollStore 免签双开、Android 全架构客户端、Windows/macOS/Linux/BSD 及 OpenWrt 路由器全系资产）。
+            基于官方 sing-box **v1.14.3** 深度适配四大专有协议，对齐官方标准实现 **全平台、全架构全量构建**（涵盖 iOS TrollStore 免签双开、Android 全架构客户端、Windows/macOS/Linux/BSD 及 OpenWrt 路由器全系资产，总计 140+ 产物）。
 
-            #### 🏷️ 独立包名与应用名称（双开共存，互不覆盖）
+            #### 🏷️ 独立包名与应用名称（双开共存，互不干扰）
             - **iOS 苹果端**:
               - 巨魔免签 IPA: 包名 `io.nekohasekai.sfa.hx`，应用显示名称 `sing-boxHX`。
               - 越狱环境 DEB: 包名 `io.nekohasekai.sfajb.hx`，应用显示名称 `sing-boxHX JB`。
+              - 内置 Ghostty 视觉主题与免断连 fallback 选择器，保留完整 VPN Entitlements 权限。
             - **Android 安卓端**:
               - 应用包名 (`applicationId`): `io.nekohasekai.sfa.hx`
               - 应用桌面显示名称: `sing-boxHX`
               - 各组件 Authority 全局隔离，可与官方 sing-box / SFA 原版完全并存双开，配置与签名互不干扰！
+              - **应用内升级重定向**: 更新源已重定向至自定义 GitHub 仓库，提供 `SFA-version-metadata.json`，静默启动更新提示，避免误跳官方。
 
             #### 🌟 核心特性与适配协议 (Supported Protocols)
             1. **Enhanced VLESS (VLESS-EH)**
@@ -483,23 +561,31 @@ jobs:
                - 直连节点（`DIRECT`）自动测速百度（connect 延迟 10~25ms）。
                - 代理节点智能测速 Google gstatic（真实网络往返延迟 60~80ms）。
 
-            #### 📱 全平台全资产安装指南 (Installation Guide)
+            #### 📱 全平台全架构资产指南 (Full Matrix Asset Guide)
             - **iOS 苹果移动端**:
-              - **巨魔免签独立双开 (TrollStore)**: 下载 `sing-boxHX-${{ env.VERSION }}-ios-trollstore.ipa`（亦提供 `sing-box-${{ env.VERSION }}-ios-trollstore.ipa` 别名），支持全套 VPN 权限。
-              - **越狱环境 (Jailbreak)**: 提供 `sing-boxHX-${{ env.VERSION }}-iphoneos-arm64.deb` (rootless) 与 `arm64e.deb` (rootful)。
-              - **开发者 SDK**: 提供 `Libbox.xcframework.zip`。
+              - **巨魔免签独立双开 (TrollStore)**: `sing-boxHX-${{ env.VERSION }}-ios-trollstore.ipa`（及 `sing-box-${{ env.VERSION }}-ios-trollstore.ipa` 别名），支持全套 VPN 权限。
+              - **越狱环境 (Jailbreak)**: `sing-boxHX-${{ env.VERSION }}-iphoneos-arm64.deb` (rootless) 与 `arm64e.deb` (rootful)。
+              - **开发者 SDK**: `Libbox.xcframework.zip`。
             - **Android 安卓移动端**:
-              - 提供全套已自签可以直接安装的 **sing-boxHX 客户端**: `sing-boxHX-${{ env.VERSION }}-arm64-v8a.apk`、`universal.apk`、`armeabi-v7a.apk`、`x86_64.apk`，及 `Libbox.aar` 动态库。
+              - **sing-boxHX 客户端**: `sing-boxHX-${{ env.VERSION }}-arm64-v8a.apk`、`universal.apk`、`armeabi-v7a.apk`、`x86_64.apk`。
+              - **自更新元数据**: `SFA-version-metadata.json`。
+              - **动态库**: `Libbox.aar` 与 `sing-boxHX-${{ env.VERSION }}-Libbox.aar`。
+              - **Android 终端 CLI**: 覆盖 arm64, armv7, amd64, 386 架构。
             - **Windows 电脑端**:
-              - 提供 `amd64` (64位)、`arm64` (骁龙笔电)、`386` (32位) 免安装压缩包。
+              - `amd64` (x86_64 64位)、`arm64` (骁龙笔电)、`386` (32位) zip 归档包。
             - **macOS 电脑端**:
-              - 提供 `darwin-arm64` (Apple Silicon M系列) 与 `darwin-amd64` (Intel) 免安装压缩包。
-            - **Linux & 软路由/硬路由端**:
-              - 提供 Linux 全 CPU 架构压缩包（包含 MIPS 全系、RISC-V、龙芯、ARM、x86）。
-              - 提供 Debian/Ubuntu `.deb` 与 CentOS/RHEL `.rpm` 官方 systemd 服务安装包。
-              - 提供针对家用路由器的 OpenWrt `.ipk` 安装包（覆盖 x86_64、aarch64 与 MT7621/mipsel 等）。
+              - `darwin-arm64` (Apple Silicon M1/M2/M3/M4) 与 `darwin-amd64` (Intel) tar.gz 归档包。
+            - **Linux & 路由器全生态**:
+              - **通用归档**: 覆盖 Linux 全 CPU 架构（x86_64, i386, arm64, armv5/v6/v7, mips/mipsle/mips64, riscv64, loong64, s390x, ppc64le）。
+              - **Debian / Ubuntu**: 全架构 `.deb` 安装包。
+              - **CentOS / RHEL / Fedora**: 全架构 `.rpm` 安装包。
+              - **Arch Linux**: `.pkg.tar.zst` (pacman) 安装包。
+              - **Alpine Linux**: `.apk` 安装包。
+              - **OpenWrt 路由器**: 覆盖 31 种路由器微架构的 `.ipk` 与新版 OpenWrt `.apk` 格式包。
+            - **BSD 系统**:
+              - FreeBSD (amd64, arm64, 386, armv7) 与 OpenBSD (amd64, arm64)。
 
             ---
 
             ### 🇺🇸 English Description
-            Custom full-matrix release of sing-box **v1.14.3** with native support for 4 custom protocols, dual-channel latency testing, custom package branding (`io.nekohasekai.sfa.hx`, `sing-boxHX`), dual-app coexistence IPA/APKs, and cross-platform core binaries.
+            Custom full-matrix release of sing-box **v1.14.3** with native support for 4 custom protocols, dual-channel latency testing, custom package branding (`io.nekohasekai.sfa.hx`, `sing-boxHX`), dual-app coexistence IPA/APKs, full OpenWrt/Arch/Alpine package matrix, and cross-platform core binaries.
