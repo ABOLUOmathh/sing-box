@@ -60,7 +60,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.9"
+            TAG_NAME="v1.14.3-hx.10"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -150,7 +150,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.9"
+            TAG_NAME="v1.14.3-hx.10"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -222,13 +222,6 @@ jobs:
               )
               with open(s_file, "w") as f:
                   f.write(data)
-
-          action_kt = "clients/android/app/src/main/java/io/nekohasekai/sfa/constant/Action.kt"
-          with open(action_kt, "r") as f:
-              act_data = f.read()
-          act_data = act_data.replace("io.nekohasekai.sfa.", "io.nekohasekai.sfa.hx.")
-          with open(action_kt, "w") as f:
-              f.write(act_data)
 
           print("Successfully applied custom package name io.nekohasekai.sfa.hx and app_name sing-boxHX")
           '
@@ -324,7 +317,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.9"
+            TAG_NAME="v1.14.3-hx.10"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -427,7 +420,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.9"
+            TAG_NAME="v1.14.3-hx.10"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
