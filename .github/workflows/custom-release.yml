@@ -396,6 +396,7 @@ jobs:
           fi
           
           if [ "$GOOS" = "android" ]; then
+            export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
             export CC='${{ matrix.ndk }}-clang'
             export CXX="${CC}++"
             CGO_ENABLED=1 go build -v -trimpath \
