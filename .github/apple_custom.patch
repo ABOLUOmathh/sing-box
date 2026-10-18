@@ -82,29 +82,121 @@ index c2d5ac2..3624e88 100644
      }
  }
 diff --git a/ApplicationLibrary/Views/Setting/GhosttyConfigurationView.swift b/ApplicationLibrary/Views/Setting/GhosttyConfigurationView.swift
-index 9b8969d..62954bb 100644
+index 9b8969d..6fccc47 100644
 --- a/ApplicationLibrary/Views/Setting/GhosttyConfigurationView.swift
 +++ b/ApplicationLibrary/Views/Setting/GhosttyConfigurationView.swift
-@@ -2,6 +2,7 @@
-     import Library
-     import SwiftUI
- 
-+#if canImport(GhosttyTerminal)
-     public struct GhosttyConfigurationView: View {
-         private static let lightDefaultTheme = "Alabaster"
-         private static let darkDefaultTheme = "Afterglow"
-@@ -196,4 +197,12 @@
+@@ -137,16 +137,29 @@
+             themePreference: SharedPreferences.Preference<String>
+         ) -> some View {
+             FormNavigationLink {
+-                ThemePickerView(
+-                    scheme: isDark ? .dark : .light,
+-                    currentName: pickerTheme.wrappedValue
+-                ) { newName in
+-                    guard !newName.isEmpty else { return }
+-                    Task {
+-                        await themePreference.set(newName)
+-                        pickerTheme.wrappedValue = newName
+-                    }
+-                }
++                #if canImport(GhosttyTerminal)
++                    ThemePickerView(
++                        scheme: isDark ? .dark : .light,
++                        currentName: pickerTheme.wrappedValue
++                    ) { newName in
++                        guard !newName.isEmpty else { return }
++                        Task {
++                            await themePreference.set(newName)
++                            pickerTheme.wrappedValue = newName
++                        }
++                    }
++                #else
++                    GhosttyThemeFallbackPickerView(
++                        isDark: isDark,
++                        selectedTheme: pickerTheme.wrappedValue
++                    ) { newName in
++                        guard !newName.isEmpty else { return }
++                        Task {
++                            await themePreference.set(newName)
++                            pickerTheme.wrappedValue = newName
++                        }
++                    }
++                #endif
+             } label: {
+                 themeRowLabel(value: pickerTheme.wrappedValue)
+             }
+@@ -196,4 +209,72 @@
              isLoading = false
          }
      }
-+#else
-+    public struct GhosttyConfigurationView: View {
-+        public init() {}
-+        public var body: some View {
-+            Text("Ghostty Terminal is not available on this platform.")
++    #if !canImport(GhosttyTerminal)
++        private struct GhosttyThemeFallbackPickerView: View {
++            let isDark: Bool
++            let selectedTheme: String
++            let onSelect: (String) -> Void
++
++            @State private var selected: String
++            @State private var searchText = ""
++            @Environment(\.dismiss) private var dismiss
++
++            private static let lightThemes = [
++                "Alabaster", "Ayu Light", "Catppuccin Latte", "GitHub Light",
++                "Gruvbox Light", "One Half Light", "Solarized Light", "Tomorrow",
++                "Xcode", "Quiet Light", "PaperColor Light", "Tokyo Night Day"
++            ]
++
++            private static let darkThemes = [
++                "Afterglow", "Ayu Dark", "Catppuccin Macchiato", "Catppuccin Mocha",
++                "Dracula", "GitHub Dark", "Gruvbox Dark", "Monokai", "Monokai Pro",
++                "Nord", "One Dark", "One Half Dark", "Solarized Dark", "Tokyo Night",
++                "Tomorrow Night", "Tomorrow Night Bright", "Material", "Night Owl"
++            ]
++
++            init(isDark: Bool, selectedTheme: String, onSelect: @escaping (String) -> Void) {
++                self.isDark = isDark
++                self.selectedTheme = selectedTheme
++                self.onSelect = onSelect
++                _selected = State(initialValue: selectedTheme)
++            }
++
++            private var themes: [String] {
++                let pool = (isDark ? Self.darkThemes : Self.lightThemes).sorted()
++                if searchText.isEmpty {
++                    return pool
++                }
++                return pool.filter { $0.localizedCaseInsensitiveContains(searchText) }
++            }
++
++            var body: some View {
++                List {
++                    ForEach(themes, id: \.self) { name in
++                        Button {
++                            selected = name
++                            onSelect(name)
++                            dismiss()
++                        } label: {
++                            HStack {
++                                Text(name)
++                                    .foregroundStyle(.primary)
++                                Spacer()
++                                if selected == name {
++                                    Image(systemName: "checkmark")
++                                        .foregroundStyle(.tint)
++                                }
++                            }
++                            .contentShape(Rectangle())
++                        }
++                        .buttonStyle(.plain)
++                    }
++                }
++                .searchable(text: $searchText)
++                .navigationTitle(isDark ? "Dark Theme" : "Light Theme")
++                #if os(iOS)
++                    .navigationBarTitleDisplayMode(.inline)
++                #endif
++            }
 +        }
-+    }
-+#endif
++    #endif
  #endif
 diff --git a/ApplicationLibrary/Views/Setting/SettingView.swift b/ApplicationLibrary/Views/Setting/SettingView.swift
 index b16bbf1..689a5a1 100644
