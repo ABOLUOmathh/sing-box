@@ -60,7 +60,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.12"
+            TAG_NAME="v1.14.3-hx.13"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -150,7 +150,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.12"
+            TAG_NAME="v1.14.3-hx.13"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -342,11 +342,6 @@ jobs:
           - { goos: openbsd, goarch: amd64 }
           - { goos: openbsd, goarch: arm64 }
 
-          # Android CLI 裸内核 (用于 Termux / Android 终端)
-          - { goos: android, goarch: arm64, ndk: "aarch64-linux-android23" }
-          - { goos: android, goarch: arm, goarm: "7", ndk: "armv7a-linux-androideabi23", name_suffix: "arm" }
-          - { goos: android, goarch: amd64, ndk: "x86_64-linux-android23" }
-          - { goos: android, goarch: "386", ndk: "i686-linux-android23" }
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -359,12 +354,6 @@ jobs:
           go-version: '1.23'
           cache: false
 
-      - name: Setup Android NDK
-        if: matrix.goos == 'android'
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r28
-
       - name: Determine Version
         run: |
           if [ -n "${{ github.event.inputs.tag_name }}" ]; then
@@ -372,7 +361,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.12"
+            TAG_NAME="v1.14.3-hx.13"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -395,20 +384,10 @@ jobs:
             BINARY_NAME="sing-box.exe"
           fi
           
-          if [ "$GOOS" = "android" ]; then
-            export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
-            export CC='${{ matrix.ndk }}-clang'
-            export CXX="${CC}++"
-            CGO_ENABLED=1 go build -v -trimpath \
-              -tags "with_quic,with_wireguard,with_utls,with_clash_api,with_gvisor" \
-              -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${VERSION}' -s -w -buildid=" \
-              -o "$BINARY_NAME" ./cmd/sing-box
-          else
-            CGO_ENABLED=0 go build -v -trimpath \
-              -tags "with_quic,with_wireguard,with_utls,with_clash_api,with_gvisor" \
-              -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${VERSION}' -s -w -buildid=" \
-              -o "$BINARY_NAME" ./cmd/sing-box
-          fi
+          CGO_ENABLED=0 go build -v -trimpath \
+            -tags "with_quic,with_wireguard,with_utls,with_clash_api,with_gvisor" \
+            -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${VERSION}' -s -w -buildid=" \
+            -o "$BINARY_NAME" ./cmd/sing-box
 
           mkdir -p core-dist
           ARCH_LABEL="${{ matrix.name_suffix || matrix.goarch }}"
@@ -512,7 +491,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.12"
+            TAG_NAME="v1.14.3-hx.13"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
