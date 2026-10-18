@@ -252,14 +252,16 @@ fi
 
 OUTPUT_DIR="$APPLE_ROOT/build"
 mkdir -p "$OUTPUT_DIR"
-IPA_NAME="sing-box-${VERSION}-ios-trollstore.ipa"
+IPA_NAME="sing-boxHX-${VERSION}-ios-trollstore.ipa"
 IPA_PATH="$OUTPUT_DIR/$IPA_NAME"
 
 echo "==> Archiving Payload into $IPA_NAME..."
 (cd "$STAGE_DIR" && zip -qry9 "$IPA_PATH" Payload)
+cp -f "$IPA_PATH" "$OUTPUT_DIR/sing-box-${VERSION}-ios-trollstore.ipa"
 
 echo "=================================================="
 echo " Successfully created TrollStore IPA:"
 echo " File: $IPA_PATH"
+echo " Also created alias: $OUTPUT_DIR/sing-box-${VERSION}-ios-trollstore.ipa"
 echo " Size: $(du -h "$IPA_PATH" | cut -f1)"
 echo "=================================================="

@@ -60,7 +60,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.8"
+            TAG_NAME="v1.14.3-hx.9"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -90,10 +90,23 @@ jobs:
         run: |
           chmod +x .github/package_ipa.sh
           .github/package_ipa.sh "${{ env.VERSION }}"
-          cp clients/apple/build/sing-box-*-ios-trollstore.ipa ios-dist/
+          cp clients/apple/build/*-ios-trollstore.ipa ios-dist/
 
       - name: Build iOS Jailbreak Deb (Optional)
         run: |
+          python3 -c '
+          import os
+          pkg_sh = "clients/apple/Jailbreak/package.sh"
+          if os.path.exists(pkg_sh):
+              with open(pkg_sh, "r") as f:
+                  s = f.read()
+              s = s.replace("BASE_PACKAGE_IDENTIFIER=\"io.nekohasekai.sfajb\"", "BASE_PACKAGE_IDENTIFIER=\"io.nekohasekai.sfajb.hx\"")
+              s = s.replace("APP_DISPLAY_NAME=\"sing-box JB\"", "APP_DISPLAY_NAME=\"sing-boxHX JB\"")
+              s = s.replace("Name: sing-box JB", "Name: sing-boxHX JB")
+              s = s.replace("SFI-${VERSION}-${architecture}.deb", "sing-boxHX-${VERSION}-${architecture}.deb")
+              with open(pkg_sh, "w") as f:
+                  f.write(s)
+          '
           (make -C clients/apple build_ios_deb && cp clients/apple/build/jailbreak/*.deb ios-dist/) || echo "Jailbreak deb build skipped"
 
       - name: Upload iOS artifacts
@@ -137,7 +150,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.8"
+            TAG_NAME="v1.14.3-hx.9"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -158,18 +171,67 @@ jobs:
           go run ./cmd/internal/merge_aar -output clients/android/app/libs/libbox.aar libbox-slices/*/libbox.aar
           go run ./cmd/internal/merge_aar -output clients/android/app/libs/libbox-legacy.aar libbox-slices/*/libbox-legacy.aar
           cp clients/android/app/libs/libbox.aar android-dist/Libbox.aar
+          cp clients/android/app/libs/libbox.aar android-dist/sing-boxHX-${VERSION}-Libbox.aar
 
       - name: Setup Keystore & Config for Android
         run: |
+          # 1. Cleanly remove pre-existing upstream keystore to prevent password verification errors
+          rm -f clients/android/app/release.keystore
+
+          # 2. Generate customized keystore for sing-boxHX
           keytool -genkey -v -keystore clients/android/app/release.keystore \
             -alias sing-box -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass singbox -keypass singbox \
-            -dname "CN=sing-box, OU=sing-box, O=sing-box, L=Unknown, ST=Unknown, C=US"
+            -dname "CN=sing-boxHX, OU=sing-boxHX, O=sing-boxHX, L=Unknown, ST=Unknown, C=US"
           cat > clients/android/local.properties <<EOF
           KEYSTORE_PASS=singbox
           ALIAS_NAME=sing-box
           ALIAS_PASS=singbox
           EOF
+
+          # 3. Synchronize version.properties
+          cat > clients/android/version.properties <<EOF
+          VERSION_CODE=744
+          VERSION_NAME=${VERSION}
+          GO_VERSION=go1.23
+          EOF
+
+          # 4. Apply custom package name & app name for coexistence
+          python3 -c '
+          import glob
+
+          with open("clients/android/app/build.gradle.kts", "r") as f:
+              gradle_kts = f.read()
+          gradle_kts = gradle_kts.replace(
+              "applicationId = \"io.nekohasekai.sfa\"",
+              "applicationId = \"io.nekohasekai.sfa.hx\""
+          )
+          gradle_kts = gradle_kts.replace(
+              "base.archivesName.set(\"SFA-${versionName}\")",
+              "base.archivesName.set(\"sing-boxHX-${versionName}\")"
+          )
+          with open("clients/android/app/build.gradle.kts", "w") as f:
+              f.write(gradle_kts)
+
+          for s_file in glob.glob("clients/android/app/src/main/res/values*/strings.xml"):
+              with open(s_file, "r") as f:
+                  data = f.read()
+              data = data.replace(
+                  "<string name=\"app_name\" translatable=\"false\">sing-box</string>",
+                  "<string name=\"app_name\" translatable=\"false\">sing-boxHX</string>"
+              )
+              with open(s_file, "w") as f:
+                  f.write(data)
+
+          action_kt = "clients/android/app/src/main/java/io/nekohasekai/sfa/constant/Action.kt"
+          with open(action_kt, "r") as f:
+              act_data = f.read()
+          act_data = act_data.replace("io.nekohasekai.sfa.", "io.nekohasekai.sfa.hx.")
+          with open(action_kt, "w") as f:
+              f.write(act_data)
+
+          print("Successfully applied custom package name io.nekohasekai.sfa.hx and app_name sing-boxHX")
+          '
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -178,11 +240,20 @@ jobs:
 
       - name: Build Android Release APKs
         run: |
-          go run -v ./cmd/internal/update_android_version --ci
+          go run -v ./cmd/internal/update_android_version --ci --nightly || true
+          ROOT_DIR="$(pwd)"
           cd clients/android
           ./gradlew --build-cache --parallel :app:assembleOtherRelease
-          cd ../..
-          cp clients/android/app/build/outputs/apk/other/release/*.apk android-dist/
+          cd "$ROOT_DIR"
+          mkdir -p android-dist
+          cd clients/android/app/build/outputs/apk/other/release/
+          for apk in *.apk; do
+            [ -f "$apk" ] || continue
+            clean_name=$(echo "$apk" | sed 's/-other-release\.apk/\.apk/')
+            cp "$apk" "$ROOT_DIR/android-dist/$clean_name"
+          done
+          cd "$ROOT_DIR"
+          ls -la android-dist/
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
@@ -253,7 +324,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.8"
+            TAG_NAME="v1.14.3-hx.9"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -356,7 +427,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.8"
+            TAG_NAME="v1.14.3-hx.9"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -379,15 +450,24 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG_NAME }}
-          name: sing-box ${{ env.VERSION }} (Full Matrix Release)
+          name: sing-boxHX ${{ env.VERSION }} (Full Matrix Release)
           draft: false
           prerelease: false
           files: release-artifacts/*
           body: |
-            ## sing-box ${{ env.VERSION }} (Full-Matrix Custom Release)
+            ## sing-boxHX ${{ env.VERSION }} (Full-Matrix Release with Custom Branding)
 
             ### 🇨🇳 中文说明 (Chinese Description)
             基于官方 sing-box **v1.14.3** 深度适配四大专有协议，对齐官方标准实现 **全平台、全架构全量构建**（涵盖 iOS TrollStore 免签双开、Android 全架构客户端、Windows/macOS/Linux/BSD 及 OpenWrt 路由器全系资产）。
+
+            #### 🏷️ 独立包名与应用名称（双开共存，互不覆盖）
+            - **iOS 苹果端**:
+              - 巨魔免签 IPA: 包名 `io.nekohasekai.sfa.hx`，应用显示名称 `sing-boxHX`。
+              - 越狱环境 DEB: 包名 `io.nekohasekai.sfajb.hx`，应用显示名称 `sing-boxHX JB`。
+            - **Android 安卓端**:
+              - 应用包名 (`applicationId`): `io.nekohasekai.sfa.hx`
+              - 应用桌面显示名称: `sing-boxHX`
+              - 各组件 Authority 全局隔离，可与官方 sing-box / SFA 原版完全并存双开，配置与签名互不干扰！
 
             #### 🌟 核心特性与适配协议 (Supported Protocols)
             1. **Enhanced VLESS (VLESS-EH)**
@@ -412,11 +492,11 @@ jobs:
 
             #### 📱 全平台全资产安装指南 (Installation Guide)
             - **iOS 苹果移动端**:
-              - **巨魔免签独立双开 (TrollStore)**: 下载 `sing-box-${{ env.VERSION }}-ios-trollstore.ipa`，支持全套 VPN 权限，与官方原版共存。
-              - **越狱环境 (Jailbreak)**: 提供 `SFI-${{ env.VERSION }}-iphoneos-arm64.deb` (rootless) 与 `arm64e.deb` (rootful)。
+              - **巨魔免签独立双开 (TrollStore)**: 下载 `sing-boxHX-${{ env.VERSION }}-ios-trollstore.ipa`（亦提供 `sing-box-${{ env.VERSION }}-ios-trollstore.ipa` 别名），支持全套 VPN 权限。
+              - **越狱环境 (Jailbreak)**: 提供 `sing-boxHX-${{ env.VERSION }}-iphoneos-arm64.deb` (rootless) 与 `arm64e.deb` (rootful)。
               - **开发者 SDK**: 提供 `Libbox.xcframework.zip`。
             - **Android 安卓移动端**:
-              - 提供全套已自签可以直接安装的 **SFA 客户端**: `arm64-v8a`、`armeabi-v7a`、`x86_64`、`universal` 安装包，及 `Libbox.aar` 动态库。
+              - 提供全套已自签可以直接安装的 **sing-boxHX 客户端**: `sing-boxHX-${{ env.VERSION }}-arm64-v8a.apk`、`universal.apk`、`armeabi-v7a.apk`、`x86_64.apk`，及 `Libbox.aar` 动态库。
             - **Windows 电脑端**:
               - 提供 `amd64` (64位)、`arm64` (骁龙笔电)、`386` (32位) 免安装压缩包。
             - **macOS 电脑端**:
@@ -429,4 +509,4 @@ jobs:
             ---
 
             ### 🇺🇸 English Description
-            Custom full-matrix release of sing-box **v1.14.3** with native support for 4 custom protocols, dual-channel latency testing, iOS TrollStore dual-app IPA, Android SFA APKs, and cross-platform core binaries.
+            Custom full-matrix release of sing-box **v1.14.3** with native support for 4 custom protocols, dual-channel latency testing, custom package branding (`io.nekohasekai.sfa.hx`, `sing-boxHX`), dual-app coexistence IPA/APKs, and cross-platform core binaries.
