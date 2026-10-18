@@ -1,4 +1,4 @@
-name: Custom Release (iOS TrollStore IPA & Core Binaries)
+name: Full-Matrix Release (iOS TrollStore, Android APK, Core & Packages)
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v1.14.3-hx.1)'
+        description: 'Release Tag (e.g. v1.14.3-hx.7)'
         required: false
         default: ''
 
@@ -60,7 +60,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.6"
+            TAG_NAME="v1.14.3-hx.7"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -102,25 +102,138 @@ jobs:
           name: ios-artifacts
           path: ios-dist/*
 
-  build-cli:
-    name: Build CLI - ${{ matrix.goos }}/${{ matrix.goarch }}
+  build-android:
+    name: Build Android APKs & Libbox.aar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: false
+
+      - name: Setup OpenJDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r28
+
+      - name: Determine Version
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+          else
+            TAG_NAME="v1.14.3-hx.7"
+          fi
+          VERSION="${TAG_NAME#v}"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Build Libbox AAR slices
+        run: |
+          make lib_install
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          mkdir -p libbox-slices
+          for arch in arm64 arm amd64 386; do
+            echo "Building libbox for android/$arch..."
+            go run ./cmd/internal/build_libbox -target android -platform android/$arch
+            mkdir -p libbox-slices/$arch
+            mv libbox.aar libbox-legacy.aar libbox-slices/$arch/
+          done
+          mkdir -p clients/android/app/libs android-dist
+          go run ./cmd/internal/merge_aar -output clients/android/app/libs/libbox.aar libbox-slices/*/libbox.aar
+          go run ./cmd/internal/merge_aar -output clients/android/app/libs/libbox-legacy.aar libbox-slices/*/libbox-legacy.aar
+          cp clients/android/app/libs/libbox.aar android-dist/Libbox.aar
+
+      - name: Setup Keystore & Config for Android
+        run: |
+          keytool -genkey -v -keystore clients/android/app/release.keystore \
+            -alias sing-box -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass singbox -keypass singbox \
+            -dname "CN=sing-box, OU=sing-box, O=sing-box, L=Unknown, ST=Unknown, C=US"
+          cat > clients/android/local.properties <<EOF
+          KEYSTORE_PASS=singbox
+          ALIAS_NAME=sing-box
+          ALIAS_PASS=singbox
+          EOF
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-provider: basic
+
+      - name: Build Android Release APKs
+        run: |
+          go run -v ./cmd/internal/update_android_version --ci
+          cd clients/android
+          ./gradlew --build-cache --parallel :app:assembleOtherRelease
+          cd ../..
+          cp clients/android/app/build/outputs/apk/other/release/*.apk android-dist/
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-artifacts
+          path: android-dist/*
+
+  build-core:
+    name: Build Core - ${{ matrix.goos }}/${{ matrix.name_suffix || matrix.goarch }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - goos: linux
-            goarch: amd64
-          - goos: linux
-            goarch: arm64
-          - goos: windows
-            goarch: amd64
-          - goos: windows
-            goarch: arm64
-          - goos: darwin
-            goarch: amd64
-          - goos: darwin
-            goarch: arm64
+          # Linux 主流架构 (含 .deb / .rpm)
+          - { goos: linux, goarch: amd64, deb: amd64, rpm: x86_64, openwrt: x86_64 }
+          - { goos: linux, goarch: arm64, deb: arm64, rpm: aarch64, openwrt: aarch64_generic }
+          - { goos: linux, goarch: "386", deb: i386, rpm: i386 }
+          - { goos: linux, goarch: arm, goarm: "7", deb: armhf, rpm: armv7hl, name_suffix: "armv7" }
+          - { goos: linux, goarch: arm, goarm: "6", deb: armel, rpm: armv6hl, name_suffix: "armv6" }
+          - { goos: linux, goarch: arm, goarm: "5", name_suffix: "armv5" }
+
+          # Linux 路由器芯片 (MIPS 架构，含 OpenWrt .ipk)
+          - { goos: linux, goarch: mipsle, gomips: softfloat, deb: mipsel, rpm: mipsel, openwrt: mipsel_24kc, name_suffix: "mipsle-softfloat" }
+          - { goos: linux, goarch: mipsle, gomips: hardfloat, name_suffix: "mipsle-hardfloat" }
+          - { goos: linux, goarch: mips, gomips: softfloat, openwrt: mips_24kc, name_suffix: "mips-softfloat" }
+          - { goos: linux, goarch: mips64, gomips: softfloat, name_suffix: "mips64" }
+          - { goos: linux, goarch: mips64le, gomips: hardfloat, name_suffix: "mips64le" }
+
+          # Linux 极客与新兴硬件
+          - { goos: linux, goarch: riscv64, deb: riscv64, rpm: riscv64 }
+          - { goos: linux, goarch: loong64, deb: loongarch64, rpm: loongarch64 }
+          - { goos: linux, goarch: s390x, deb: s390x, rpm: s390x }
+          - { goos: linux, goarch: ppc64le, deb: ppc64el, rpm: ppc64le }
+
+          # Windows 全架构
+          - { goos: windows, goarch: amd64 }
+          - { goos: windows, goarch: arm64 }
+          - { goos: windows, goarch: "386" }
+
+          # macOS Darwin
+          - { goos: darwin, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+
+          # BSD 家族
+          - { goos: freebsd, goarch: amd64 }
+          - { goos: freebsd, goarch: arm64 }
+          - { goos: freebsd, goarch: "386" }
+          - { goos: freebsd, goarch: arm, goarm: "7", name_suffix: "armv7" }
+          - { goos: openbsd, goarch: amd64 }
+          - { goos: openbsd, goarch: arm64 }
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -140,7 +253,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.1"
+            TAG_NAME="v1.14.3-hx.7"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -150,34 +263,87 @@ jobs:
         run: |
           GOOS=${{ matrix.goos }}
           GOARCH=${{ matrix.goarch }}
+          export GOOS GOARCH
+          if [ -n "${{ matrix.goarm }}" ]; then
+            export GOARM="${{ matrix.goarm }}"
+          fi
+          if [ -n "${{ matrix.gomips }}" ]; then
+            export GOMIPS="${{ matrix.gomips }}"
+          fi
+
           BINARY_NAME="sing-box"
           if [ "$GOOS" = "windows" ]; then
             BINARY_NAME="sing-box.exe"
           fi
           
-          CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -v -trimpath \
+          CGO_ENABLED=0 go build -v -trimpath \
             -tags "with_quic,with_wireguard,with_utls,with_clash_api,with_gvisor" \
             -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${VERSION}' -s -w -buildid=" \
             -o "$BINARY_NAME" ./cmd/sing-box
 
-          mkdir -p cli-dist
-          PACKAGE_BASE="sing-box-${VERSION}-${GOOS}-${GOARCH}"
+          mkdir -p core-dist
+          ARCH_LABEL="${{ matrix.name_suffix || matrix.goarch }}"
+          PACKAGE_BASE="sing-box-${VERSION}-${GOOS}-${ARCH_LABEL}"
           if [ "$GOOS" = "windows" ]; then
-            zip -j "cli-dist/${PACKAGE_BASE}.zip" "$BINARY_NAME" LICENSE
+            zip -j "core-dist/${PACKAGE_BASE}.zip" "$BINARY_NAME" LICENSE
           else
-            tar -czvf "cli-dist/${PACKAGE_BASE}.tar.gz" "$BINARY_NAME" LICENSE
+            tar -czvf "core-dist/${PACKAGE_BASE}.tar.gz" "$BINARY_NAME" LICENSE
           fi
 
-      - name: Upload CLI artifact
+      - name: Package DEB / RPM / IPK (if applicable)
+        if: matrix.deb != '' || matrix.rpm != '' || matrix.openwrt != ''
+        run: |
+          sudo gem install --no-document fpm
+          mkdir -p dist
+          cp sing-box dist/
+          PKG_VERSION="${VERSION}"
+
+          # Package DEB
+          if [ -n "${{ matrix.deb }}" ]; then
+            cp .fpm_systemd .fpm
+            fpm -t deb \
+              -v "$PKG_VERSION" \
+              -p "core-dist/sing-box_${VERSION}_linux_${{ matrix.deb }}.deb" \
+              --architecture "${{ matrix.deb }}" \
+              dist/sing-box=/usr/bin/sing-box
+          fi
+
+          # Package RPM
+          if [ -n "${{ matrix.rpm }}" ]; then
+            echo '%_rpmformat 4' > "$HOME/.rpmmacros"
+            cp .fpm_systemd .fpm
+            fpm -t rpm \
+              -v "$PKG_VERSION" \
+              -p "core-dist/sing-box_${VERSION}_linux_${{ matrix.rpm }}.rpm" \
+              --architecture "${{ matrix.rpm }}" \
+              dist/sing-box=/usr/bin/sing-box
+          fi
+
+          # Package OpenWrt IPK
+          if [ -n "${{ matrix.openwrt }}" ]; then
+            cp .fpm_openwrt .fpm
+            fpm -t deb \
+              -v "$PKG_VERSION" \
+              -p "dist/openwrt.deb" \
+              --architecture all \
+              dist/sing-box=/usr/bin/sing-box
+            for arch in ${{ matrix.openwrt }}; do
+              chmod +x .github/deb2ipk.sh
+              .github/deb2ipk.sh "$arch" "dist/openwrt.deb" "core-dist/sing-box_${VERSION}_openwrt_${arch}.ipk"
+            done
+            rm -f "dist/openwrt.deb"
+          fi
+
+      - name: Upload Core artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cli-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: cli-dist/*
+          name: core-${{ matrix.goos }}-${{ matrix.name_suffix || matrix.goarch }}
+          path: core-dist/*
 
   publish-release:
-    name: Publish GitHub Release
+    name: Publish Full-Matrix GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-ios, build-cli]
+    needs: [build-ios, build-android, build-core]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -189,7 +355,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.1"
+            TAG_NAME="v1.14.3-hx.7"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -212,15 +378,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG_NAME }}
-          name: sing-box ${{ env.VERSION }} (Custom 4-Protocol & iOS Support)
+          name: sing-box ${{ env.VERSION }} (Full Matrix Release)
           draft: false
           prerelease: false
           files: release-artifacts/*
           body: |
-            ## sing-box ${{ env.VERSION }} (Custom Release)
+            ## sing-box ${{ env.VERSION }} (Full-Matrix Custom Release)
 
             ### 🇨🇳 中文说明 (Chinese Description)
-            基于官方 sing-box **v1.14.3** 深度适配四大专有协议，优先实现 iOS 设备（支持 iOS 15.0+ 及 iOS 16.0+）免签与自签完整适配，兼顾跨平台核心客户端。
+            基于官方 sing-box **v1.14.3** 深度适配四大专有协议，对齐官方标准实现 **全平台、全架构全量构建**（涵盖 iOS TrollStore 免签双开、Android 全架构客户端、Windows/macOS/Linux/BSD 及 OpenWrt 路由器全系资产）。
 
             #### 🌟 核心特性与适配协议 (Supported Protocols)
             1. **Enhanced VLESS (VLESS-EH)**
@@ -239,22 +405,27 @@ jobs:
                - 兼容 `2022-blake3-aes-128-gcm`。
                - 自动解析 `identityPSK:masterPSK#BLACKSTONE`。
                - 挂载 27 字节 fixedPlain 附带 `MD5(base64(masterPSK))` 校验头，缺少显式 UDP 配置时自动启用 UOT。
+            5. **智能双通道真实测速**
+               - 直连节点（`DIRECT`）自动测速百度（connect 延迟 10~25ms）。
+               - 代理节点智能测速 Google gstatic（真实网络往返延迟 60~80ms）。
 
-            #### 📱 iOS 设备安装说明 (iOS Installation Guide)
-            - **巨魔商店安装 (TrollStore, 推荐 iOS 15.0 - 16.6.1 / 17.0)**:
-              下载 `sing-box-${{ env.VERSION }}-ios-trollstore.ipa`，使用 TrollStore 直接打开安装，即可直接获得系统 NetworkExtension 完整 VPN 权限，免证书免续期。
-            - **个人 / 企业证书自签安装 (AltStore / SideStore / Sideloadly)**:
-              下载 `sing-box-${{ env.VERSION }}-ios-trollstore.ipa`，直接导入 AltStore / SideStore 进行重签名并安装即可。
-            - **越狱设备 (Jailbreak)**:
-              提供 `SFI-${{ env.VERSION }}-iphoneos-arm64.deb`，通过 Sileo / Zebra 安装。
-            - **开发者集成**:
-              提供包含 4 大协议适配的 `Libbox.xcframework.zip`。
-
-            #### 🔄 维护体系与定向优化
-            - **版本规范**: 遵循 `{官方版本}-hx.{自定义小版本}` 规范（如 `v1.14.3-hx.1`），代码模块高度解耦，便于后续随时合并官方更新。
-            - **关于界面与更新检查**: 客户端关于页面的源码链接与更新检测已完整重定向至本仓库 `https://github.com/ABOLUOmathh/sing-box`。
+            #### 📱 全平台全资产安装指南 (Installation Guide)
+            - **iOS 苹果移动端**:
+              - **巨魔免签独立双开 (TrollStore)**: 下载 `sing-box-${{ env.VERSION }}-ios-trollstore.ipa`，支持全套 VPN 权限，与官方原版共存。
+              - **越狱环境 (Jailbreak)**: 提供 `SFI-${{ env.VERSION }}-iphoneos-arm64.deb` (rootless) 与 `arm64e.deb` (rootful)。
+              - **开发者 SDK**: 提供 `Libbox.xcframework.zip`。
+            - **Android 安卓移动端**:
+              - 提供全套已自签可以直接安装的 **SFA 客户端**: `arm64-v8a`、`armeabi-v7a`、`x86_64`、`universal` 安装包，及 `Libbox.aar` 动态库。
+            - **Windows 电脑端**:
+              - 提供 `amd64` (64位)、`arm64` (骁龙笔电)、`386` (32位) 免安装压缩包。
+            - **macOS 电脑端**:
+              - 提供 `darwin-arm64` (Apple Silicon M系列) 与 `darwin-amd64` (Intel) 免安装压缩包。
+            - **Linux & 软路由/硬路由端**:
+              - 提供 Linux 全 CPU 架构压缩包（包含 MIPS 全系、RISC-V、龙芯、ARM、x86）。
+              - 提供 Debian/Ubuntu `.deb` 与 CentOS/RHEL `.rpm` 官方 systemd 服务安装包。
+              - 提供针对家用路由器的 OpenWrt `.ipk` 安装包（覆盖 x86_64、aarch64 与 MT7621/mipsel 等）。
 
             ---
 
             ### 🇺🇸 English Description
-            Custom release of sing-box **v1.14.3** with native support for 4 custom protocols, tailored for iOS (TrollStore & Sideloading, iOS 15.0+) and cross-platform CLI.
+            Custom full-matrix release of sing-box **v1.14.3** with native support for 4 custom protocols, dual-channel latency testing, iOS TrollStore dual-app IPA, Android SFA APKs, and cross-platform core binaries.
