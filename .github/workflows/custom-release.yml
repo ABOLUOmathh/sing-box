@@ -60,7 +60,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.13"
+            TAG_NAME="v1.14.3-hx.14"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -150,7 +150,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.13"
+            TAG_NAME="v1.14.3-hx.14"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -175,14 +175,8 @@ jobs:
 
       - name: Setup Keystore & Config for Android
         run: |
-          # 1. Cleanly remove pre-existing upstream keystore to prevent password verification errors
-          rm -f clients/android/app/release.keystore
-
-          # 2. Generate customized keystore for sing-boxHX
-          keytool -genkey -v -keystore clients/android/app/release.keystore \
-            -alias sing-box -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass singbox -keypass singbox \
-            -dname "CN=sing-boxHX, OU=sing-boxHX, O=sing-boxHX, L=Unknown, ST=Unknown, C=US"
+          # 1. Use the persistent sing-boxHX keystore to guarantee identical signatures across all updates
+          cp .github/sing-box-hx.keystore clients/android/app/release.keystore
           cat > clients/android/local.properties <<EOF
           KEYSTORE_PASS=singbox
           ALIAS_NAME=sing-box
@@ -361,7 +355,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.13"
+            TAG_NAME="v1.14.3-hx.14"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -491,7 +485,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.13"
+            TAG_NAME="v1.14.3-hx.14"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
