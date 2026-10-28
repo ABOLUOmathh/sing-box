@@ -16,7 +16,7 @@
 
 ## 📖 项目简介 (Overview)
 
-**sing-boxHX** 是基于官方 [sing-box](https://github.com/SagerNet/sing-box) **v1.14.3** 深度适配与定制的高性能通用代理平台。
+**sing-boxHX** 是基于官方 [sing-box](https://github.com/SagerNet/sing-box) **v1.14.4** 深度适配与定制的高性能通用代理平台。
 
 针对原版在专有协议支持、客户端独立双开、iOS 巨魔免签生态以及路由器架构适配上的局限性，**sing-boxHX** 实现了底层协议原生编译、全平台全架构自动化交付，并在 iOS 与 Android 端提供了与官方原版完全隔离的专属客户端。
 
@@ -127,7 +127,7 @@
 
 ```bash
 # 1. 克隆本仓库
-git clone -b dev-1.14.3 https://github.com/ABOLUOmathh/sing-box.git
+git clone -b dev-1.14.4 https://github.com/ABOLUOmathh/sing-box.git
 cd sing-box
 
 # 2. 编译包含所有专有协议的 sing-box 核心

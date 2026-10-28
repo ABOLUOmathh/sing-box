@@ -10,10 +10,10 @@ cd "$APPLE_ROOT"
 VERSION="${1:-}"
 if [[ -z "$VERSION" ]]; then
   if command -v git >/dev/null 2>&1; then
-    VERSION="$(git describe --tags --always 2>/dev/null || echo "1.14.3")"
+    VERSION="$(git describe --tags --always 2>/dev/null || echo "1.14.4")"
     VERSION="${VERSION#v}"
   else
-    VERSION="1.14.3"
+    VERSION="1.14.4"
   fi
 fi
 

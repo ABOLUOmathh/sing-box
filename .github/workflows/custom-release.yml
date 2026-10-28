@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v1.14.3-hx.7)'
+        description: 'Release Tag (e.g. v1.14.4-hx.1)'
         required: false
         default: ''
 
@@ -43,7 +43,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.26.10'
           cache: false
 
       - name: Install Apple build tools
@@ -60,7 +60,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.14"
+            TAG_NAME="v1.14.4-hx.1"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -128,7 +128,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.26.10'
           cache: false
 
       - name: Setup OpenJDK 17
@@ -150,7 +150,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.14"
+            TAG_NAME="v1.14.4-hx.1"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -185,9 +185,9 @@ jobs:
 
           # 3. Synchronize version.properties
           cat > clients/android/version.properties <<EOF
-          VERSION_CODE=744
+          VERSION_CODE=746
           VERSION_NAME=${VERSION}
-          GO_VERSION=go1.23
+          GO_VERSION=go1.26.10
           EOF
 
           # 4. Apply custom package name, app name, update check redirection & silent update prompt
@@ -345,7 +345,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.26.10'
           cache: false
 
       - name: Determine Version
@@ -355,7 +355,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.14"
+            TAG_NAME="v1.14.4-hx.1"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -485,7 +485,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.3-hx.14"
+            TAG_NAME="v1.14.4-hx.1"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -516,7 +516,7 @@ jobs:
             ## sing-boxHX ${{ env.VERSION }} (Full-Matrix Release with Custom Branding)
 
             ### 🇨🇳 中文说明 (Chinese Description)
-            基于官方 sing-box **v1.14.3** 深度适配四大专有协议，对齐官方标准实现 **全平台、全架构全量构建**（涵盖 iOS TrollStore 免签双开、Android 全架构客户端、Windows/macOS/Linux/BSD 及 OpenWrt 路由器全系资产，总计 140+ 产物）。
+            基于官方 sing-box **v1.14.4** 深度适配四大专有协议，对齐官方标准实现 **全平台、全架构全量构建**（涵盖 iOS TrollStore 免签双开、Android 全架构客户端、Windows/macOS/Linux/BSD 及 OpenWrt 路由器全系资产，总计 140+ 产物）。
 
             #### 🏷️ 独立包名与应用名称（双开共存，互不干扰）
             - **iOS 苹果端**:
@@ -577,4 +577,4 @@ jobs:
             ---
 
             ### 🇺🇸 English Description
-            Custom full-matrix release of sing-box **v1.14.3** with native support for 4 custom protocols, dual-channel latency testing, custom package branding (`io.nekohasekai.sfa.hx`, `sing-boxHX`), dual-app coexistence IPA/APKs, full OpenWrt/Arch/Alpine package matrix, and cross-platform core binaries.
+            Custom full-matrix release of sing-box **v1.14.4** with native support for 4 custom protocols, dual-channel latency testing, custom package branding (`io.nekohasekai.sfa.hx`, `sing-boxHX`), dual-app coexistence IPA/APKs, full OpenWrt/Arch/Alpine package matrix, and cross-platform core binaries.
