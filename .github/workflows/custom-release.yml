@@ -206,8 +206,8 @@ jobs:
             export CC="${ndk_target}-clang"
             export CXX="${ndk_target}-clang++"
             export CGO_ENABLED=1
-            export BUILD_GOOS=android
-            export BUILD_GOARCH="${g_arch}"
+            export GOOS=android
+            export GOARCH="${g_arch}"
             if [ -n "$g_arm" ]; then
               export GOARM="${g_arm}"
             else
