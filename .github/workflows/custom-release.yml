@@ -120,28 +120,31 @@ jobs:
             -project sing-box.xcodeproj \
             -scheme SFM.System \
             -configuration Release \
+            -destination 'generic/platform=macOS' \
             -archivePath build/SFM.System-universal.xcarchive \
             -derivedDataPath build/SFM.System-universal.dd \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" || true
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            COMPILER_INDEX_STORE_ENABLE=NO || true
             
-          SFM_APP="build/SFM.System-universal.xcarchive/Products/Applications/SFM.app"
-          if [ -d "$SFM_APP" ]; then
-            echo "==> SFM.app built, signing ad-hoc..."
+          SFM_APP="$(find build -name "SFM.app" 2>/dev/null | head -1)"
+          if [ -n "$SFM_APP" ] && [ -d "$SFM_APP" ]; then
+            echo "==> SFM.app found at $SFM_APP, signing ad-hoc..."
             codesign --force --deep -s - "$SFM_APP" || true
             
             mkdir -p build/dmg-root
             cp -R "$SFM_APP" build/dmg-root/SFM.app
-            ln -s /Applications build/dmg-root/Applications
+            ln -s /Applications build/dmg-root/Applications || true
             
             hdiutil create -volname "sing-box" -srcfolder build/dmg-root -ov -format UDZO "../../ios-dist/SFM-HX-${VERSION}-Universal.dmg" || true
-            cd build/SFM.System-universal.xcarchive/Products/Applications
-            zip -qry9 "../../../../ios-dist/SFM-HX-${VERSION}-Universal.zip" SFM.app
-            cd ../../../..
+            (cd "$(dirname "$SFM_APP")" && zip -qry9 "$GITHUB_WORKSPACE/ios-dist/SFM-HX-${VERSION}-Universal.zip" SFM.app) || true
             echo "==> SFM packaging finished."
           else
-            echo "Warning: SFM.app not found in xcarchive, skipping packaging"
+            echo "Warning: SFM.app not found in build directory, skipping packaging"
           fi
           cd ../..
 
@@ -586,6 +589,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libarchive-tools libgtk-3-dev libappindicator3-dev rpm
           pip install ziglang
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
           corepack disable || true
           npm install -g pnpm@11.28.9
 
