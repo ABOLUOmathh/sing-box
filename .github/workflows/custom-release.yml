@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v1.14.4-hx.2)'
+        description: 'Release Tag (e.g. v1.14.4-hx.3)'
         required: false
         default: ''
 
@@ -60,7 +60,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.2"
+            TAG_NAME="v1.14.4-hx.3"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -84,13 +84,13 @@ jobs:
           rm -rf clients/apple/Libbox.xcframework
           cp -R Libbox.xcframework clients/apple/Libbox.xcframework
           mkdir -p ios-dist
-          zip -qry9 "ios-dist/Libbox.xcframework.zip" Libbox.xcframework
+          zip -qry9 "ios-dist/Libbox-HX-${VERSION}.xcframework.zip" Libbox.xcframework
 
       - name: Package iOS TrollStore & Sideload IPA
         run: |
           chmod +x .github/package_ipa.sh
           .github/package_ipa.sh "${{ env.VERSION }}"
-          cp clients/apple/build/*-ios-trollstore.ipa ios-dist/
+          cp clients/apple/build/*trollstore.ipa ios-dist/
 
       - name: Build iOS Jailbreak Deb (Optional)
         run: |
@@ -103,7 +103,7 @@ jobs:
               s = s.replace("BASE_PACKAGE_IDENTIFIER=\"io.nekohasekai.sfajb\"", "BASE_PACKAGE_IDENTIFIER=\"io.nekohasekai.sfajb.hx\"")
               s = s.replace("APP_DISPLAY_NAME=\"sing-box JB\"", "APP_DISPLAY_NAME=\"sing-boxHX JB\"")
               s = s.replace("Name: sing-box JB", "Name: sing-boxHX JB")
-              s = s.replace("SFI-${VERSION}-${architecture}.deb", "sing-boxHX-${VERSION}-${architecture}.deb")
+              s = s.replace("SFI-${VERSION}-${architecture}.deb", "SFI-HX-${VERSION}-${architecture}.deb")
               s = s.replace("VERSION=\"$(awk", "VERSION=\"${CUSTOM_VERSION:-$(awk").replace("sing-box.xcodeproj/project.pbxproj)\"", "sing-box.xcodeproj/project.pbxproj)}\"")
               with open(pkg_sh, "w") as f:
                   f.write(s)
@@ -151,7 +151,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.2"
+            TAG_NAME="v1.14.4-hx.3"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -171,7 +171,7 @@ jobs:
           mkdir -p clients/android/app/libs android-dist
           go run ./cmd/internal/merge_aar -output clients/android/app/libs/libbox.aar libbox-slices/*/libbox.aar
           go run ./cmd/internal/merge_aar -output clients/android/app/libs/libbox-legacy.aar libbox-slices/*/libbox-legacy.aar
-          cp clients/android/app/libs/libbox.aar android-dist/sing-boxHX-${VERSION}-Libbox.aar
+          cp clients/android/app/libs/libbox.aar "android-dist/Libbox-HX-${VERSION}.aar"
 
       - name: Build Android CLI Core Binaries
         run: |
@@ -236,7 +236,7 @@ jobs:
 
           # 3. Synchronize version.properties
           cat > clients/android/version.properties <<EOF
-          VERSION_CODE=747
+          VERSION_CODE=748
           VERSION_NAME=${VERSION}
           GO_VERSION=go1.26.10
           EOF
@@ -253,7 +253,7 @@ jobs:
           )
           gradle_kts = gradle_kts.replace(
               "base.archivesName.set(\"SFA-${versionName}\")",
-              "base.archivesName.set(\"sing-boxHX-${versionName}\")"
+              "base.archivesName.set(\"SFA-HX-${versionName}\")"
           )
           with open("clients/android/app/build.gradle.kts", "w") as f:
               f.write(gradle_kts)
@@ -330,7 +330,7 @@ jobs:
           cd "$ROOT_DIR"
           cat > "$ROOT_DIR/android-dist/SFA-version-metadata.json" << EOF
           {
-            "version_code": 747,
+            "version_code": 748,
             "version_name": "${VERSION}"
           }
           EOF
@@ -406,7 +406,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.2"
+            TAG_NAME="v1.14.4-hx.3"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -536,7 +536,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.2"
+            TAG_NAME="v1.14.4-hx.3"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -602,15 +602,15 @@ jobs:
                - 代理节点智能测速 Google gstatic（真实网络往返延迟 60~80ms）。
 
             #### 📱 全平台全架构资产指南 (Full Matrix Asset Guide)
-            - **iOS 苹果移动端**:
-              - **巨魔免签独立双开 (TrollStore)**: `sing-boxHX-${{ env.VERSION }}-ios-trollstore.ipa`，支持全套 VPN 权限。
-              - **越狱环境 (Jailbreak)**: `sing-boxHX-${{ env.VERSION }}-iphoneos-arm64.deb` (rootless) 与 `arm64e.deb` (rootful)。
-              - **开发者 SDK**: `Libbox.xcframework.zip`。
-            - **Android 安卓移动端**:
-              - **sing-boxHX 客户端 (APK)**: `sing-boxHX-${{ env.VERSION }}-arm64-v8a.apk`、`universal.apk`、`armeabi-v7a.apk`、`x86_64.apk`。
+            - **Android 安卓移动端 (SFA-HX 官方规范前缀，首屏前排展示)**:
+              - **SFA-HX 客户端 (APK)**: `SFA-HX-${{ env.VERSION }}-arm64-v8a.apk`、`universal.apk`、`armeabi-v7a.apk`、`x86_64.apk`。
               - **自更新元数据**: `SFA-version-metadata.json`。
-              - **动态库 (SDK)**: `sing-boxHX-${{ env.VERSION }}-Libbox.aar`。
+              - **二次开发 SDK (带精准版本号)**: `Libbox-HX-${{ env.VERSION }}.aar`。
               - **Android 终端独立内核 (CLI Core)**: `sing-box-${{ env.VERSION }}-android-arm64.tar.gz`、`android-arm.tar.gz`、`android-amd64.tar.gz`、`android-386.tar.gz`（适配 Magisk / KernelSU / Box4Magisk / ShellCrash 等透明代理模块与 Termux 环境）。
+            - **iOS 苹果移动端 (SFI-HX 官方规范前缀)**:
+              - **巨魔免签独立双开 (TrollStore IPA)**: `SFI-HX-${{ env.VERSION }}-trollstore.ipa`，支持全套 VPN 权限。
+              - **越狱环境 (Jailbreak DEB)**: `SFI-HX-${{ env.VERSION }}-iphoneos-arm64.deb` (rootless) 与 `arm64e.deb` (rootful)。
+              - **二次开发 SDK (带精准版本号)**: `Libbox-HX-${{ env.VERSION }}.xcframework.zip`。
             - **Windows 电脑端**:
               - `amd64` (x86_64 64位)、`arm64` (骁龙笔电)、`386` (32位) zip 归档包。
             - **macOS 电脑端**:

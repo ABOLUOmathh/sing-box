@@ -252,7 +252,7 @@ fi
 
 OUTPUT_DIR="$APPLE_ROOT/build"
 mkdir -p "$OUTPUT_DIR"
-IPA_NAME="sing-boxHX-${VERSION}-ios-trollstore.ipa"
+IPA_NAME="SFI-HX-${VERSION}-trollstore.ipa"
 IPA_PATH="$OUTPUT_DIR/$IPA_NAME"
 
 echo "==> Archiving Payload into $IPA_NAME..."

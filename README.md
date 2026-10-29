@@ -58,10 +58,9 @@
   - 独家集成 Ghostty 终端高质感视觉主题。
   - 配备 `GhosttyThemeFallbackPickerView` 防崩溃兜底选择器，保证在 iOS 15.0 ~ 18+ 全环境稳定运行不闪退。
 - **产物形态**：
-  - `sing-boxHX-*-ios-trollstore.ipa`（首选）
-  - `sing-box-*-ios-trollstore.ipa`（兼容原版命名工具）
-  - `sing-boxHX-*-iphoneos-arm64.deb` / `arm64e.deb`（越狱环境）
-  - `Libbox.xcframework.zip`（供第三方 Swift/Obj-C 开发者集成）
+  - `SFI-HX-*-trollstore.ipa`（首选，TrollStore 导入）
+  - `SFI-HX-*-iphoneos-arm64.deb` / `arm64e.deb`（越狱环境）
+  - `Libbox-HX-*.xcframework.zip`（供第三方 Swift/Obj-C 开发者集成）
 
 ### 🤖 Android 安卓端 (SFA 专属客户端)
 - **包名与显示名**：应用包名 (`applicationId`) `io.nekohasekai.sfa.hx`，应用显示名称 `sing-boxHX`。
@@ -86,8 +85,9 @@
 
 | 平台 / 系统 | 架构 / 格式 | 主要资产文件说明 |
 | :--- | :--- | :--- |
-| **Android 客户端** | arm64-v8a, universal, armeabi-v7a, x86_64, x86 | `sing-boxHX-*-arm64-v8a.apk`, `universal.apk` 及动态库 `Libbox.aar`, 自更新元数据 `SFA-version-metadata.json` |
-| **iOS 客户端** | arm64, arm64e | `sing-boxHX-*-ios-trollstore.ipa`, 越狱 `.deb`, `Libbox.xcframework.zip` |
+| **Android 客户端 (SFA-HX)** | arm64-v8a, universal, armeabi-v7a, x86_64, x86 | `SFA-HX-*-arm64-v8a.apk`, `universal.apk` 及动态库 `Libbox-HX-*.aar`, 自更新元数据 `SFA-version-metadata.json` |
+| **Android 独立内核** | arm64, arm, amd64, 386 | `sing-box-*-android-arm64.tar.gz` 等（适配 Magisk / KernelSU / ShellCrash / Termux 独立透明代理运行） |
+| **iOS 客户端 (SFI-HX)** | arm64, arm64e | `SFI-HX-*-trollstore.ipa`, 越狱 `SFI-HX-*.deb`, `Libbox-HX-*.xcframework.zip` |
 | **OpenWrt 路由器** | **31 种微架构全覆盖** (兼具 `.ipk` 与新版 `.apk`) | 涵盖 MT7621/mipsel、AR9331、IPQ4019/807x、Cortex-A53/A72/A76、x86_64、LoongArch、RISC-V 等所有软硬路由芯片 |
 | **Debian / Ubuntu** | 全 CPU 架构 (`.deb`) | `sing-box_*_linux_amd64.deb`, `arm64.deb`, `mipsel.deb`, `riscv64.deb` 等（自带 systemd 服务） |
 | **CentOS / RHEL** | 全 CPU 架构 (`.rpm`) | `sing-box_*_linux_x86_64.rpm`, `aarch64.rpm`, `mipsel.rpm` 等 |
@@ -105,8 +105,8 @@
 
 前往 [GitHub Releases](https://github.com/ABOLUOmathh/sing-box/releases) 获取最新稳定版本产物：
 
-1. **Android 用户**：下载 `sing-boxHX-<version>-arm64-v8a.apk`（主流手机推荐）或 `universal.apk` 直接安装。
-2. **iOS 巨魔用户**：下载 `sing-boxHX-<version>-ios-trollstore.ipa`，在手机上通过 TrollStore 导入安装。
+1. **Android 用户**：下载 `SFA-HX-<version>-arm64-v8a.apk`（主流手机推荐）或 `universal.apk` 直接安装。
+2. **iOS 巨魔用户**：下载 `SFI-HX-<version>-trollstore.ipa`，在手机上通过 TrollStore 导入安装。
 3. **OpenWrt 路由器用户**：根据路由器 CPU 架构下载对应的 `.ipk` 或 `.apk`，通过 SSH 执行安装：
    ```bash
    opkg install sing-box_<version>_openwrt_<arch>.ipk
