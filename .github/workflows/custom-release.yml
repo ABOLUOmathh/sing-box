@@ -587,7 +587,7 @@ jobs:
           sudo apt-get install -y libarchive-tools libgtk-3-dev libappindicator3-dev rpm
           pip install ziglang
           corepack disable || true
-          npm install -g pnpm@latest
+          npm install -g pnpm@11.28.9
 
       - name: Determine Version
         run: |
@@ -654,7 +654,7 @@ jobs:
       - name: Setup pnpm
         run: |
           corepack disable || true
-          npm install -g pnpm@latest
+          npm install -g pnpm@11.28.9
         shell: bash
 
       - name: Determine Version
