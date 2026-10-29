@@ -8,6 +8,16 @@ mkdir -p "$OUTPUT_DIR"
 cd clients/apple
 mkdir -p build
 
+echo "==> Ensuring exact package versions from Package.resolved..."
+python3 -c '
+pbx = "sing-box.xcodeproj/project.pbxproj"
+with open(pbx, "r") as f:
+    s = f.read()
+s = s.replace("kind = upToNextMajorVersion;\n\t\t\t\tminimumVersion = 2.2.2026100703;", "kind = exactVersion;\n\t\t\t\tversion = 2.2.2026100703;")
+with open(pbx, "w") as f:
+    f.write(s)
+'
+
 echo "==> Building SFM for macOS Universal..."
 xcodebuild archive \
   -project sing-box.xcodeproj \
@@ -18,6 +28,7 @@ xcodebuild archive \
   -derivedDataPath build/SFM.System-universal.dd \
   -skipPackagePluginValidation \
   -skipMacroValidation \
+  -onlyUsePackageVersionsFromResolvedFile \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY="" \
