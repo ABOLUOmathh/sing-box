@@ -111,6 +111,8 @@ jobs:
           (CUSTOM_VERSION="${{ env.VERSION }}" make -C clients/apple build_ios_deb && cp clients/apple/build/jailbreak/*.deb ios-dist/) || echo "Jailbreak deb build skipped"
 
       - name: Build and Package SFM Multi-Arch (Apple, Intel, Universal)
+        env:
+          DISABLE_SWIFTLINT: "1"
         run: |
           bash .github/package_sfm.sh "${{ env.VERSION }}" "$PWD/ios-dist"
 

@@ -73,6 +73,8 @@ jobs:
           cp -R Libbox.xcframework clients/apple/Libbox.xcframework
 
       - name: Build and Package SFM Multi-Arch (Apple, Intel, Universal)
+        env:
+          DISABLE_SWIFTLINT: "1"
         run: |
           bash .github/package_sfm.sh "${{ env.VERSION }}" "$PWD/sfm-dist"
 
