@@ -700,7 +700,7 @@ jobs:
     name: Publish Full-Matrix GitHub Release
     runs-on: ubuntu-latest
     needs: [build-ios, build-android, build-core, build-desktop-linux, build-desktop-windows]
-    if: always() && needs.build-ios.result == 'success' && needs.build-android.result == 'success' && (needs.build-core.result == 'success' || needs.build-core.result == 'failure')
+    if: always() && needs.build-ios.result == 'success' && needs.build-android.result == 'success' && needs.build-desktop-linux.result == 'success' && needs.build-desktop-windows.result == 'success' && (needs.build-core.result == 'success' || needs.build-core.result == 'failure')
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
