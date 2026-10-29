@@ -2,6 +2,7 @@
 """
 Patch clients/desktop configuration and scripts for sing-boxHX builds:
 - Sync version.json with target release version and Go version
+- Fix broken pnpm@11.13.0 packageManager pins
 - Standardize artifact naming to SFW-HX and SFL-HX
 - Enable optional code signing (supports building without private EV cert)
 - Allow flexible Go version matching and local toolchain
@@ -59,7 +60,24 @@ def main():
         json.dump(version_data, f, indent=2)
     print(f"Updated {version_json_path} to version {target_version}, go {go_ver}")
 
-    # 2. Patch electron-builder.yml
+    # 2. Fix broken pnpm@11.13.0 in package.json and dashboard/package.json
+    for pj in [
+        os.path.join(desktop_dir, "package.json"),
+        os.path.join(desktop_dir, "dashboard", "package.json"),
+    ]:
+        if os.path.isfile(pj):
+            try:
+                with open(pj, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if "packageManager" in data:
+                    del data["packageManager"]
+                with open(pj, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+                print(f"Removed broken packageManager pin from {pj}")
+            except Exception as e:
+                print(f"Warning: failed to process {pj}: {e}")
+
+    # 3. Patch electron-builder.yml
     eb_yml = os.path.join(desktop_dir, "electron-builder.yml")
     patch_file(eb_yml, [
         ("forceCodeSigning: true", "forceCodeSigning: false"),
@@ -68,7 +86,7 @@ def main():
         ("artifactName: SFL-${version}-${arch}.pkg.tar.zst", "artifactName: SFL-HX-${version}-${arch}.pkg.tar.zst"),
     ])
 
-    # 3. Patch afterPack.cjs
+    # 4. Patch afterPack.cjs
     after_pack = os.path.join(desktop_dir, "scripts", "afterPack.cjs")
     patch_file(after_pack, [
         (
@@ -77,7 +95,7 @@ def main():
         )
     ])
 
-    # 4. Patch package.ts
+    # 5. Patch package.ts
     package_ts = os.path.join(desktop_dir, "scripts", "package.ts")
     patch_file(package_ts, [
         (
