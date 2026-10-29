@@ -690,7 +690,8 @@ jobs:
           pnpm generate
           pnpm package:win x64
           mkdir -p ../../desktop-windows-dist
-          cp release/SFW-HX-*.exe ../../desktop-windows-dist/ || true
+          cp release/SFW-HX-*.exe ../../desktop-windows-dist/
+          ls -la ../../desktop-windows-dist/
           cd ../..
         shell: bash
 

@@ -1,0 +1,81 @@
+name: Build and Upload SFW (Windows Desktop GUI)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.14.4-hx.4)'
+        required: true
+        default: 'v1.14.4-hx.4'
+
+permissions:
+  contents: write
+
+jobs:
+  build-sfw:
+    name: Build Desktop Windows (SFW GUI)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.10'
+          cache: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Setup pnpm
+        run: |
+          corepack disable || true
+          npm install -g pnpm@11.28.9
+        shell: bash
+
+      - name: Determine Version
+        run: |
+          TAG_NAME="${{ github.event.inputs.tag_name }}"
+          VERSION="${TAG_NAME#v}"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Prepare and Patch Desktop Client
+        run: |
+          python3 .github/patch_desktop.py "${{ env.VERSION }}"
+          go mod download
+        shell: bash
+
+      - name: Build Windows Desktop Installer (SFW-HX)
+        run: |
+          cd clients/desktop
+          pnpm install --frozen-lockfile=false
+          pnpm -C dashboard install --frozen-lockfile=false
+          pnpm -C dashboard generate
+          pnpm generate
+          pnpm package:win x64
+          mkdir -p ../../desktop-windows-dist
+          cp release/SFW-HX-*.exe ../../desktop-windows-dist/
+          ls -la ../../desktop-windows-dist/
+          cd ../..
+        shell: bash
+
+      - name: Upload SFW to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Uploading SFW assets to release ${{ env.TAG_NAME }}..."
+          gh release upload "${{ env.TAG_NAME }}" desktop-windows-dist/* --clobber -R "${{ github.repository }}"
+        shell: bash

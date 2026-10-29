@@ -91,7 +91,11 @@ def main():
     patch_file(after_pack, [
         (
             '  if (context.electronPlatformName !== "win32") {\n    return;\n  }',
-            '  if (context.electronPlatformName !== "win32") {\n    return;\n  }\n  if (!context.packager.isCodeSigningSet() || context.packager.platformSpecificBuildOptions?.forceCodeSigning === false) {\n    return;\n  }'
+            '  if (context.electronPlatformName !== "win32") {\n    return;\n  }\n  if (!context.packager.platformSpecificBuildOptions || context.packager.platformSpecificBuildOptions.forceCodeSigning === false) {\n    return;\n  }'
+        ),
+        (
+            '    const signed = await context.packager.signIf(executablePath);\n    if (!signed) {\n      throw new Error(`failed to sign ${relativePath.join("/")}`);\n    }',
+            '    try {\n      await context.packager.signIf(executablePath);\n    } catch (e) {\n      console.warn(`Skipping code signing for ${relativePath.join("/")}: ${e}`);\n    }'
         )
     ])
 
