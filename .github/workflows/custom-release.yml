@@ -603,8 +603,8 @@ jobs:
 
       - name: Prepare and Patch Desktop Client
         run: |
-          python3 .github/patch_desktop.py
-          go run ./cmd/internal/update_desktop_version -ci
+          python3 .github/patch_desktop.py "${{ env.VERSION }}"
+          go mod download
 
       - name: Build Linux Desktop Packages (SFL-HX)
         run: |
@@ -670,8 +670,8 @@ jobs:
 
       - name: Prepare and Patch Desktop Client
         run: |
-          python3 .github/patch_desktop.py
-          go run ./cmd/internal/update_desktop_version -ci
+          python3 .github/patch_desktop.py "${{ env.VERSION }}"
+          go mod download
         shell: bash
 
       - name: Build Windows Desktop Installer (SFW-HX)

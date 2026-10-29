@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
 Patch clients/desktop configuration and scripts for sing-boxHX builds:
+- Sync version.json with target release version and Go version
 - Standardize artifact naming to SFW-HX and SFL-HX
 - Enable optional code signing (supports building without private EV cert)
-- Allow flexible Go version matching
+- Allow flexible Go version matching and local toolchain
 """
 
 import os
 import sys
+import json
+import subprocess
 
 def patch_file(path, replacements):
     if not os.path.isfile(path):
@@ -32,7 +35,31 @@ def main():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     desktop_dir = os.path.join(root, "clients", "desktop")
 
-    # 1. Patch electron-builder.yml
+    # Determine target version
+    target_version = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("VERSION", "1.14.4")
+    if target_version.startswith("v"):
+        target_version = target_version[1:]
+
+    # Determine local Go version
+    try:
+        res = subprocess.run(["go", "env", "GOVERSION"], stdout=subprocess.PIPE, text=True, check=True)
+        go_ver = res.stdout.strip()
+    except Exception:
+        go_ver = "go1.26.10"
+    if not go_ver:
+        go_ver = "go1.26.10"
+
+    # 1. Update version.json directly
+    version_json_path = os.path.join(desktop_dir, "version.json")
+    version_data = {
+        "version": target_version,
+        "go_version": go_ver
+    }
+    with open(version_json_path, "w", encoding="utf-8") as f:
+        json.dump(version_data, f, indent=2)
+    print(f"Updated {version_json_path} to version {target_version}, go {go_ver}")
+
+    # 2. Patch electron-builder.yml
     eb_yml = os.path.join(desktop_dir, "electron-builder.yml")
     patch_file(eb_yml, [
         ("forceCodeSigning: true", "forceCodeSigning: false"),
@@ -41,7 +68,7 @@ def main():
         ("artifactName: SFL-${version}-${arch}.pkg.tar.zst", "artifactName: SFL-HX-${version}-${arch}.pkg.tar.zst"),
     ])
 
-    # 2. Patch afterPack.cjs
+    # 3. Patch afterPack.cjs
     after_pack = os.path.join(desktop_dir, "scripts", "afterPack.cjs")
     patch_file(after_pack, [
         (
@@ -50,9 +77,13 @@ def main():
         )
     ])
 
-    # 3. Patch package.ts
+    # 4. Patch package.ts
     package_ts = os.path.join(desktop_dir, "scripts", "package.ts")
     patch_file(package_ts, [
+        (
+            'return { ...process.env, GOTOOLCHAIN: goVersion };',
+            'return { ...process.env, GOTOOLCHAIN: "local" };'
+        ),
         (
             'const artifactName = `SFW-\\${version}-${artifactArchitecture}${developmentPackage ? "-dev" : ""}.\\${ext}`;',
             'const artifactName = `SFW-HX-\\${version}-${artifactArchitecture}${developmentPackage ? "-dev" : ""}.\\${ext}`;'
