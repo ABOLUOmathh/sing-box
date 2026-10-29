@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v1.14.4-hx.1)'
+        description: 'Release Tag (e.g. v1.14.4-hx.2)'
         required: false
         default: ''
 
@@ -60,7 +60,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.1"
+            TAG_NAME="v1.14.4-hx.2"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -151,7 +151,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.1"
+            TAG_NAME="v1.14.4-hx.2"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -236,7 +236,7 @@ jobs:
 
           # 3. Synchronize version.properties
           cat > clients/android/version.properties <<EOF
-          VERSION_CODE=746
+          VERSION_CODE=747
           VERSION_NAME=${VERSION}
           GO_VERSION=go1.26.10
           EOF
@@ -330,7 +330,7 @@ jobs:
           cd "$ROOT_DIR"
           cat > "$ROOT_DIR/android-dist/SFA-version-metadata.json" << EOF
           {
-            "version_code": 744,
+            "version_code": 747,
             "version_name": "${VERSION}"
           }
           EOF
@@ -406,7 +406,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.1"
+            TAG_NAME="v1.14.4-hx.2"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -536,7 +536,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.1"
+            TAG_NAME="v1.14.4-hx.2"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
