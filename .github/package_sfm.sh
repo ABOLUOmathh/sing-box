@@ -18,6 +18,31 @@ with open(pbx, "w") as f:
     f.write(s)
 '
 
+echo "==> Patching TailscaleSSHTerminalWindow.swift for x86_64 Mac compatibility..."
+python3 -c '
+path = "MacLibrary/TailscaleSSHTerminalWindow.swift"
+with open(path, "r") as f:
+    s = f.read()
+target = """            if let session {
+                TerminalWrapperView(session)
+            } else {
+                Color.clear
+            }"""
+replacement = """            #if canImport(GhosttyTerminal)
+            if let session {
+                TerminalWrapperView(session)
+            } else {
+                Color.clear
+            }
+            #else
+            Color.clear
+            #endif"""
+if target in s:
+    s = s.replace(target, replacement)
+    with open(path, "w") as f:
+        f.write(s)
+'
+
 echo "==> Building SFM for macOS Universal..."
 xcodebuild archive \
   -project sing-box.xcodeproj \
