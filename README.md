@@ -79,22 +79,23 @@
 
 ---
 
-## 📦 全平台全架构资产矩阵 (131+ Full Matrix Assets)
+## 📦 全平台全架构资产矩阵 (140+ Full Matrix Assets)
 
-本项目的 GitHub Actions CI/CD 流水线对齐官方全量标准，单次发布涵盖 **131+ 个构建资产**：
+本项目的 GitHub Actions CI/CD 流水线对齐官方全量标准，单次发布涵盖 **140+ 个构建资产**（实现 Android / iOS / Windows / macOS / Linux 五大图形客户端全套对齐）：
 
 | 平台 / 系统 | 架构 / 格式 | 主要资产文件说明 |
 | :--- | :--- | :--- |
 | **Android 客户端 (SFA-HX)** | arm64-v8a, universal, armeabi-v7a, x86_64, x86 | `SFA-HX-*-arm64-v8a.apk`, `universal.apk` 及动态库 `Libbox-HX-*.aar`, 自更新元数据 `SFA-version-metadata.json` |
 | **Android 独立内核** | arm64, arm, amd64, 386 | `sing-box-*-android-arm64.tar.gz` 等（适配 Magisk / KernelSU / ShellCrash / Termux 独立透明代理运行） |
 | **iOS 客户端 (SFI-HX)** | arm64, arm64e | `SFI-HX-*-trollstore.ipa`, 越狱 `SFI-HX-*.deb`, `Libbox-HX-*.xcframework.zip` |
+| **Windows 桌面端 (SFW-HX)** | x64 安装程序 (`.exe`) + CLI (`.zip`) | `SFW-HX-*-x64.exe` 图形客户端安装包；`sing-box-*-windows-amd64.zip`、`arm64.zip` 独立内核 |
+| **macOS 桌面端 (SFM-HX)** | Universal (`.dmg` & `.zip`) + CLI (`.tar.gz`) | `SFM-HX-*-Universal.dmg` 与 `.zip`（原生状态栏图形应用，适配 M1~M4 与 Intel）；`darwin-arm64.tar.gz` 独立内核 |
+| **Linux 桌面端 (SFL-HX)** | x64 (`.deb`, `.rpm`, `.pkg.tar.zst`) | `SFL-HX-*-amd64.deb`、`x86_64.rpm`、`x64.pkg.tar.zst` 桌面客户端（带 Wayland 托盘与 polkit 提权） |
 | **OpenWrt 路由器** | **31 种微架构全覆盖** (兼具 `.ipk` 与新版 `.apk`) | 涵盖 MT7621/mipsel、AR9331、IPQ4019/807x、Cortex-A53/A72/A76、x86_64、LoongArch、RISC-V 等所有软硬路由芯片 |
 | **Debian / Ubuntu** | 全 CPU 架构 (`.deb`) | `sing-box_*_linux_amd64.deb`, `arm64.deb`, `mipsel.deb`, `riscv64.deb` 等（自带 systemd 服务） |
 | **CentOS / RHEL** | 全 CPU 架构 (`.rpm`) | `sing-box_*_linux_x86_64.rpm`, `aarch64.rpm`, `mipsel.rpm` 等 |
 | **Arch Linux** | Pacman (`.pkg.tar.zst`) | `sing-box_*_linux_x86_64.pkg.tar.zst`, `aarch64.pkg.tar.zst`, `armv7hl.pkg.tar.zst` |
 | **Alpine Linux** | Alpine (`.apk`) | `sing-box_*_linux_x86_64.apk`, `aarch64.apk`, `riscv64.apk` 等 |
-| **Windows 桌面端** | amd64, arm64, 386 (`.zip`) | `sing-box-*-windows-amd64.zip`, `arm64.zip` (骁龙笔电), `386.zip` |
-| **macOS 桌面端** | darwin-arm64, darwin-amd64 (`.tar.gz`) | 支持 Apple Silicon M1~M4 系列及 Intel Mac 电脑 |
 | **BSD 操作系统** | FreeBSD, OpenBSD (`.tar.gz`) | `sing-box-*-freebsd-amd64.tar.gz`, `arm64.tar.gz`, `openbsd-amd64.tar.gz` 等 |
 
 所有发布的资产包及其校验值可在每次发布的 `sha256sums.txt` 中核对。
@@ -105,9 +106,12 @@
 
 前往 [GitHub Releases](https://github.com/ABOLUOmathh/sing-box/releases) 获取最新稳定版本产物：
 
-1. **Android 用户**：下载 `SFA-HX-<version>-arm64-v8a.apk`（主流手机推荐）或 `universal.apk` 直接安装。
+1. **Android 手机用户**：下载 `SFA-HX-<version>-arm64-v8a.apk`（主流手机推荐）或 `universal.apk` 直接安装。
 2. **iOS 巨魔用户**：下载 `SFI-HX-<version>-trollstore.ipa`，在手机上通过 TrollStore 导入安装。
-3. **OpenWrt 路由器用户**：根据路由器 CPU 架构下载对应的 `.ipk` 或 `.apk`，通过 SSH 执行安装：
+3. **Windows 电脑用户**：下载 `SFW-HX-<version>-x64.exe` 直接运行图形安装包体验完整功能。
+4. **macOS 电脑用户**：下载 `SFM-HX-<version>-Universal.dmg` 拖入“应用程序”文件夹即可使用。
+5. **Linux 桌面用户**：下载 `SFL-HX-<version>-amd64.deb`（Ubuntu/Debian）或 `.rpm`（Fedora/openSUSE）安装。
+6. **OpenWrt 路由器用户**：根据路由器 CPU 架构下载对应的 `.ipk` 或 `.apk`，通过 SSH 执行安装：
    ```bash
    opkg install sing-box_<version>_openwrt_<arch>.ipk
    /etc/init.d/sing-box enable && /etc/init.d/sing-box start

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v1.14.4-hx.3)'
+        description: 'Release Tag (e.g. v1.14.4-hx.4)'
         required: false
         default: ''
 
@@ -60,7 +60,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.3"
+            TAG_NAME="v1.14.4-hx.4"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -77,10 +77,10 @@ jobs:
             cd ../..
           fi
 
-      - name: Build Libbox.xcframework (iOS 15.0+)
+      - name: Build Libbox.xcframework (iOS 15.0+ & macOS 13.0+)
         run: |
           export PATH="$PATH:$HOME/go/bin"
-          go run ./cmd/internal/build_libbox -target apple -platform ios
+          go run ./cmd/internal/build_libbox -target apple -platform ios,macos
           rm -rf clients/apple/Libbox.xcframework
           cp -R Libbox.xcframework clients/apple/Libbox.xcframework
           mkdir -p ios-dist
@@ -110,10 +110,45 @@ jobs:
           '
           (CUSTOM_VERSION="${{ env.VERSION }}" make -C clients/apple build_ios_deb && cp clients/apple/build/jailbreak/*.deb ios-dist/) || echo "Jailbreak deb build skipped"
 
-      - name: Upload iOS artifacts
+      - name: Build and Package SFM (macOS Universal App & DMG)
+        run: |
+          echo "==> Building SFM for macOS Universal..."
+          cd clients/apple
+          mkdir -p build
+          
+          xcodebuild archive \
+            -project sing-box.xcodeproj \
+            -scheme SFM.System \
+            -configuration Release \
+            -archivePath build/SFM.System-universal.xcarchive \
+            -derivedDataPath build/SFM.System-universal.dd \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" || true
+            
+          SFM_APP="build/SFM.System-universal.xcarchive/Products/Applications/SFM.app"
+          if [ -d "$SFM_APP" ]; then
+            echo "==> SFM.app built, signing ad-hoc..."
+            codesign --force --deep -s - "$SFM_APP" || true
+            
+            mkdir -p build/dmg-root
+            cp -R "$SFM_APP" build/dmg-root/SFM.app
+            ln -s /Applications build/dmg-root/Applications
+            
+            hdiutil create -volname "sing-box" -srcfolder build/dmg-root -ov -format UDZO "../../ios-dist/SFM-HX-${VERSION}-Universal.dmg" || true
+            cd build/SFM.System-universal.xcarchive/Products/Applications
+            zip -qry9 "../../../../ios-dist/SFM-HX-${VERSION}-Universal.zip" SFM.app
+            cd ../../../..
+            echo "==> SFM packaging finished."
+          else
+            echo "Warning: SFM.app not found in xcarchive, skipping packaging"
+          fi
+          cd ../..
+
+      - name: Upload Apple artifacts (iOS & macOS)
         uses: actions/upload-artifact@v4
         with:
-          name: ios-artifacts
+          name: apple-artifacts
           path: ios-dist/*
 
   build-android:
@@ -151,7 +186,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.3"
+            TAG_NAME="v1.14.4-hx.4"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -236,7 +271,7 @@ jobs:
 
           # 3. Synchronize version.properties
           cat > clients/android/version.properties <<EOF
-          VERSION_CODE=748
+          VERSION_CODE=749
           VERSION_NAME=${VERSION}
           GO_VERSION=go1.26.10
           EOF
@@ -330,7 +365,7 @@ jobs:
           cd "$ROOT_DIR"
           cat > "$ROOT_DIR/android-dist/SFA-version-metadata.json" << EOF
           {
-            "version_code": 748,
+            "version_code": 749,
             "version_name": "${VERSION}"
           }
           EOF
@@ -406,7 +441,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.3"
+            TAG_NAME="v1.14.4-hx.4"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -520,10 +555,148 @@ jobs:
           name: core-${{ matrix.goos }}-${{ matrix.name_suffix || matrix.goarch }}
           path: core-dist/*
 
+  build-desktop-linux:
+    name: Build Desktop Linux (SFL GUI)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.10'
+          cache: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools libgtk-3-dev libappindicator3-dev rpm
+          pip install ziglang
+          npm install -g pnpm@latest
+
+      - name: Determine Version
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+          else
+            TAG_NAME="v1.14.4-hx.4"
+          fi
+          VERSION="${TAG_NAME#v}"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Prepare and Patch Desktop Client
+        run: |
+          python3 .github/patch_desktop.py
+          go run ./cmd/internal/update_desktop_version -ci
+
+      - name: Build Linux Desktop Packages (SFL-HX)
+        run: |
+          cd clients/desktop
+          pnpm install --frozen-lockfile=false
+          pnpm -C dashboard install --frozen-lockfile=false
+          pnpm -C dashboard generate
+          pnpm generate
+          pnpm package:linux x64
+          mkdir -p ../../desktop-linux-dist
+          cp release/SFL-HX-* ../../desktop-linux-dist/ || true
+          cd ../..
+
+      - name: Upload Desktop Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux-artifacts
+          path: desktop-linux-dist/*
+
+  build-desktop-windows:
+    name: Build Desktop Windows (SFW GUI)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.10'
+          cache: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Setup pnpm
+        run: npm install -g pnpm@latest
+        shell: bash
+
+      - name: Determine Version
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+          else
+            TAG_NAME="v1.14.4-hx.4"
+          fi
+          VERSION="${TAG_NAME#v}"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Prepare and Patch Desktop Client
+        run: |
+          python3 .github/patch_desktop.py
+          go run ./cmd/internal/update_desktop_version -ci
+        shell: bash
+
+      - name: Build Windows Desktop Installer (SFW-HX)
+        run: |
+          cd clients/desktop
+          pnpm install --frozen-lockfile=false
+          pnpm -C dashboard install --frozen-lockfile=false
+          pnpm -C dashboard generate
+          pnpm generate
+          pnpm package:win x64
+          mkdir -p ../../desktop-windows-dist
+          cp release/SFW-HX-*.exe ../../desktop-windows-dist/ || true
+          cd ../..
+        shell: bash
+
+      - name: Upload Desktop Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-artifacts
+          path: desktop-windows-dist/*
+
   publish-release:
     name: Publish Full-Matrix GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-ios, build-android, build-core]
+    needs: [build-ios, build-android, build-core, build-desktop-linux, build-desktop-windows]
     if: always() && needs.build-ios.result == 'success' && needs.build-android.result == 'success' && (needs.build-core.result == 'success' || needs.build-core.result == 'failure')
     steps:
       - name: Checkout repository
@@ -536,7 +709,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.3"
+            TAG_NAME="v1.14.4-hx.4"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -567,7 +740,7 @@ jobs:
             ## sing-boxHX ${{ env.VERSION }} (Full-Matrix Release with Custom Branding)
 
             ### 🇨🇳 中文说明 (Chinese Description)
-            基于官方 sing-box **v1.14.4** 深度适配四大专有协议，对齐官方标准实现 **全平台、全架构全量构建**（涵盖 iOS TrollStore 免签双开、Android 全架构客户端、Windows/macOS/Linux/BSD 及 OpenWrt 路由器全系资产，总计 140+ 产物）。
+            基于官方 sing-box **v1.14.4** 深度适配四大专有协议，对齐官方标准实现 **全平台、全架构全量构建**（涵盖 Windows/macOS/Linux/Android/iOS 官方五大全套客户端 SFW/SFM/SFL/SFA/SFI，以及 Linux/BSD/OpenWrt 路由器全系资产，总计 140+ 产物）。
 
             #### 🏷️ 独立包名与应用名称（双开共存，互不干扰）
             - **iOS 苹果端**:
@@ -579,6 +752,10 @@ jobs:
               - 应用桌面显示名称: `sing-boxHX`
               - 各组件 Authority 全局隔离，可与官方 sing-box / SFA 原版完全并存双开，配置与签名互不干扰！
               - **应用内升级重定向**: 更新源已重定向至自定义 GitHub 仓库，提供 `SFA-version-metadata.json`，静默启动更新提示，避免误跳官方。
+            - **桌面端三剑客 (SFW / SFM / SFL)**:
+              - Windows: `SFW-HX` 独立图形安装包。
+              - macOS: `SFM-HX` 独立原生状态栏应用。
+              - Linux: `SFL-HX` 独立桌面客户端。
 
             #### 🌟 核心特性与适配协议 (Supported Protocols)
             1. **Enhanced VLESS (VLESS-EH)**
@@ -611,11 +788,15 @@ jobs:
               - **巨魔免签独立双开 (TrollStore IPA)**: `SFI-HX-${{ env.VERSION }}-trollstore.ipa`，支持全套 VPN 权限。
               - **越狱环境 (Jailbreak DEB)**: `SFI-HX-${{ env.VERSION }}-iphoneos-arm64.deb` (rootless) 与 `arm64e.deb` (rootful)。
               - **二次开发 SDK (带精准版本号)**: `Libbox-HX-${{ env.VERSION }}.xcframework.zip`。
-            - **Windows 电脑端**:
-              - `amd64` (x86_64 64位)、`arm64` (骁龙笔电)、`386` (32位) zip 归档包。
-            - **macOS 电脑端**:
-              - `darwin-arm64` (Apple Silicon M1/M2/M3/M4) 与 `darwin-amd64` (Intel) tar.gz 归档包。
-            - **Linux & 路由器全生态**:
+            - **Windows 桌面端 (SFW-HX 官方图形安装包)**:
+              - **SFW-HX 客户端 (EXE)**: `SFW-HX-${{ env.VERSION }}-x64.exe`，集成独立控制面板与 sing-box 守护进程。
+              - **命令行内核 (CLI Core)**: `sing-box-${{ env.VERSION }}-windows-amd64.zip`、`arm64.zip`、`386.zip`。
+            - **macOS 桌面端 (SFM-HX 官方原生图形客户端)**:
+              - **SFM-HX 客户端 (DMG & ZIP)**: `SFM-HX-${{ env.VERSION }}-Universal.dmg` 与 `SFM-HX-${{ env.VERSION }}-Universal.zip`（原生状态栏客户端，同时适配 Apple Silicon M 系列与 Intel Mac 电脑）。
+              - **命令行内核 (CLI Core)**: `sing-box-${{ env.VERSION }}-darwin-arm64.tar.gz` 与 `darwin-amd64.tar.gz`。
+            - **Linux 桌面端 (SFL-HX 官方图形客户端)**:
+              - **SFL-HX 客户端**: `SFL-HX-${{ env.VERSION }}-amd64.deb`、`SFL-HX-${{ env.VERSION }}-x86_64.rpm`、`SFL-HX-${{ env.VERSION }}-x64.pkg.tar.zst`（带 Wayland 托盘与 polkit 提权服务）。
+            - **Linux 服务器 & 路由器全生态 (全架构纯内核)**:
               - **通用归档**: 覆盖 Linux 全 CPU 架构（x86_64, i386, arm64, armv5/v6/v7, mips/mipsle/mips64, riscv64, loong64, s390x, ppc64le）。
               - **Debian / Ubuntu**: 全架构 `.deb` 安装包。
               - **CentOS / RHEL / Fedora**: 全架构 `.rpm` 安装包。
@@ -628,4 +809,4 @@ jobs:
             ---
 
             ### 🇺🇸 English Description
-            Custom full-matrix release of sing-box **v1.14.4** with native support for 4 custom protocols, dual-channel latency testing, custom package branding (`io.nekohasekai.sfa.hx`, `sing-boxHX`), dual-app coexistence IPA/APKs, full OpenWrt/Arch/Alpine package matrix, and cross-platform core binaries.
+            Custom full-matrix release of sing-box **v1.14.4** with native support for 4 custom protocols, dual-channel latency testing, custom package branding (`io.nekohasekai.sfa.hx`, `sing-boxHX`), dual-app coexistence IPA/APKs, official desktop clients suite (SFW-HX, SFM-HX, SFL-HX), full OpenWrt/Arch/Alpine package matrix, and cross-platform core binaries.
