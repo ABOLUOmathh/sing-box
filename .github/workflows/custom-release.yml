@@ -104,10 +104,11 @@ jobs:
               s = s.replace("APP_DISPLAY_NAME=\"sing-box JB\"", "APP_DISPLAY_NAME=\"sing-boxHX JB\"")
               s = s.replace("Name: sing-box JB", "Name: sing-boxHX JB")
               s = s.replace("SFI-${VERSION}-${architecture}.deb", "sing-boxHX-${VERSION}-${architecture}.deb")
+              s = s.replace("VERSION=\"$(awk", "VERSION=\"${CUSTOM_VERSION:-$(awk").replace("sing-box.xcodeproj/project.pbxproj)\"", "sing-box.xcodeproj/project.pbxproj)}\"")
               with open(pkg_sh, "w") as f:
                   f.write(s)
           '
-          (make -C clients/apple build_ios_deb && cp clients/apple/build/jailbreak/*.deb ios-dist/) || echo "Jailbreak deb build skipped"
+          (CUSTOM_VERSION="${{ env.VERSION }}" make -C clients/apple build_ios_deb && cp clients/apple/build/jailbreak/*.deb ios-dist/) || echo "Jailbreak deb build skipped"
 
       - name: Upload iOS artifacts
         uses: actions/upload-artifact@v4
@@ -170,8 +171,58 @@ jobs:
           mkdir -p clients/android/app/libs android-dist
           go run ./cmd/internal/merge_aar -output clients/android/app/libs/libbox.aar libbox-slices/*/libbox.aar
           go run ./cmd/internal/merge_aar -output clients/android/app/libs/libbox-legacy.aar libbox-slices/*/libbox-legacy.aar
-          cp clients/android/app/libs/libbox.aar android-dist/Libbox.aar
           cp clients/android/app/libs/libbox.aar android-dist/sing-boxHX-${VERSION}-Libbox.aar
+
+      - name: Build Android CLI Core Binaries
+        run: |
+          set -xeuo pipefail
+          go install -v ./cmd/internal/build
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          if [ -n "${ANDROID_NDK_HOME:-}" ] && [ -d "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin" ]; then
+            export PATH="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
+          fi
+
+          TAGS=$(cat release/DEFAULT_BUILD_TAGS_OTHERS)
+          LDFLAGS_SHARED=$(cat release/LDFLAGS)
+
+          # Arch matrix: "goarch:goarm:ndk_target:out_arch"
+          ARCH_CONFIGS=(
+            "arm64::aarch64-linux-android23:arm64"
+            "arm:7:armv7a-linux-androideabi23:arm"
+            "amd64::x86_64-linux-android23:amd64"
+            "386::i686-linux-android23:386"
+          )
+
+          mkdir -p android-cli-build android-dist
+          for item in "${ARCH_CONFIGS[@]}"; do
+            IFS=":" read -r g_arch g_arm ndk_target out_arch <<< "$item"
+            echo "==> Compiling sing-box CLI binary for Android ($out_arch)..."
+
+            DIR_NAME="sing-box-${VERSION}-android-${out_arch}"
+            STAGE_DIR="android-cli-build/${DIR_NAME}"
+            rm -rf "$STAGE_DIR"
+            mkdir -p "$STAGE_DIR"
+
+            export CC="${ndk_target}-clang"
+            export CXX="${ndk_target}-clang++"
+            export CGO_ENABLED=1
+            export BUILD_GOOS=android
+            export BUILD_GOARCH="${g_arch}"
+            if [ -n "$g_arm" ]; then
+              export GOARM="${g_arm}"
+            else
+              unset GOARM || true
+            fi
+
+            build go build -v -trimpath -tags "${TAGS}" \
+              -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${VERSION}' ${LDFLAGS_SHARED} -s -w -buildid=" \
+              -o "${STAGE_DIR}/sing-box" \
+              ./cmd/sing-box
+
+            cp LICENSE "${STAGE_DIR}/"
+            tar -czvf "android-dist/${DIR_NAME}.tar.gz" -C android-cli-build "${DIR_NAME}"
+          done
+          rm -rf android-cli-build
 
       - name: Setup Keystore & Config for Android
         run: |
@@ -552,14 +603,14 @@ jobs:
 
             #### 📱 全平台全架构资产指南 (Full Matrix Asset Guide)
             - **iOS 苹果移动端**:
-              - **巨魔免签独立双开 (TrollStore)**: `sing-boxHX-${{ env.VERSION }}-ios-trollstore.ipa`（及 `sing-box-${{ env.VERSION }}-ios-trollstore.ipa` 别名），支持全套 VPN 权限。
+              - **巨魔免签独立双开 (TrollStore)**: `sing-boxHX-${{ env.VERSION }}-ios-trollstore.ipa`，支持全套 VPN 权限。
               - **越狱环境 (Jailbreak)**: `sing-boxHX-${{ env.VERSION }}-iphoneos-arm64.deb` (rootless) 与 `arm64e.deb` (rootful)。
               - **开发者 SDK**: `Libbox.xcframework.zip`。
             - **Android 安卓移动端**:
-              - **sing-boxHX 客户端**: `sing-boxHX-${{ env.VERSION }}-arm64-v8a.apk`、`universal.apk`、`armeabi-v7a.apk`、`x86_64.apk`。
+              - **sing-boxHX 客户端 (APK)**: `sing-boxHX-${{ env.VERSION }}-arm64-v8a.apk`、`universal.apk`、`armeabi-v7a.apk`、`x86_64.apk`。
               - **自更新元数据**: `SFA-version-metadata.json`。
-              - **动态库**: `Libbox.aar` 与 `sing-boxHX-${{ env.VERSION }}-Libbox.aar`。
-              - **Android 终端 CLI**: 覆盖 arm64, armv7, amd64, 386 架构。
+              - **动态库 (SDK)**: `sing-boxHX-${{ env.VERSION }}-Libbox.aar`。
+              - **Android 终端独立内核 (CLI Core)**: `sing-box-${{ env.VERSION }}-android-arm64.tar.gz`、`android-arm.tar.gz`、`android-amd64.tar.gz`、`android-386.tar.gz`（适配 Magisk / KernelSU / Box4Magisk / ShellCrash 等透明代理模块与 Termux 环境）。
             - **Windows 电脑端**:
               - `amd64` (x86_64 64位)、`arm64` (骁龙笔电)、`386` (32位) zip 归档包。
             - **macOS 电脑端**:
