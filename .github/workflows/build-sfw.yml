@@ -1,4 +1,4 @@
-name: Build and Upload SFW (Windows Desktop GUI)
+name: Build and Upload SFW (Windows Desktop GUI Multi-Arch)
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-sfw:
-    name: Build Desktop Windows (SFW GUI)
+    name: Build Desktop Windows (SFW GUI Multi-Arch)
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -36,7 +36,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-msvc
+          targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc, aarch64-pc-windows-msvc
 
       - name: Setup pnpm
         run: |
@@ -58,14 +58,14 @@ jobs:
           go mod download
         shell: bash
 
-      - name: Build Windows Desktop Installer (SFW-HX)
+      - name: Build Windows Desktop Installer (SFW-HX Multi-Arch)
         run: |
           cd clients/desktop
           pnpm install --frozen-lockfile=false
           pnpm -C dashboard install --frozen-lockfile=false
           pnpm -C dashboard generate
           pnpm generate
-          pnpm package:win x64
+          pnpm package:win
           mkdir -p ../../desktop-windows-dist
           cp release/SFW-HX-*.exe ../../desktop-windows-dist/
           ls -la ../../desktop-windows-dist/

@@ -110,43 +110,9 @@ jobs:
           '
           (CUSTOM_VERSION="${{ env.VERSION }}" make -C clients/apple build_ios_deb && cp clients/apple/build/jailbreak/*.deb ios-dist/) || echo "Jailbreak deb build skipped"
 
-      - name: Build and Package SFM (macOS Universal App & DMG)
+      - name: Build and Package SFM Multi-Arch (Apple, Intel, Universal)
         run: |
-          echo "==> Building SFM for macOS Universal..."
-          cd clients/apple
-          mkdir -p build
-          
-          xcodebuild archive \
-            -project sing-box.xcodeproj \
-            -scheme SFM.System \
-            -configuration Release \
-            -destination 'generic/platform=macOS' \
-            -archivePath build/SFM.System-universal.xcarchive \
-            -derivedDataPath build/SFM.System-universal.dd \
-            -skipPackagePluginValidation \
-            -skipMacroValidation \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            COMPILER_INDEX_STORE_ENABLE=NO || true
-            
-          SFM_APP="$(find build -name "SFM.app" 2>/dev/null | head -1)"
-          if [ -n "$SFM_APP" ] && [ -d "$SFM_APP" ]; then
-            echo "==> SFM.app found at $SFM_APP, signing ad-hoc..."
-            codesign --force --deep -s - "$SFM_APP" || true
-            
-            mkdir -p build/dmg-root
-            cp -R "$SFM_APP" build/dmg-root/SFM.app
-            ln -s /Applications build/dmg-root/Applications || true
-            
-            hdiutil create -volname "sing-box" -srcfolder build/dmg-root -ov -format UDZO "../../ios-dist/SFM-HX-${VERSION}-Universal.dmg" || true
-            (cd "$(dirname "$SFM_APP")" && zip -qry9 "$GITHUB_WORKSPACE/ios-dist/SFM-HX-${VERSION}-Universal.zip" SFM.app) || true
-            echo "==> SFM packaging finished."
-          else
-            echo "Warning: SFM.app not found in build directory, skipping packaging"
-          fi
-          cd ../..
+          bash .github/package_sfm.sh "${{ env.VERSION }}" "$PWD/ios-dist"
 
       - name: Upload Apple artifacts (iOS & macOS)
         uses: actions/upload-artifact@v4
@@ -653,7 +619,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-msvc
+          targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc, aarch64-pc-windows-msvc
 
       - name: Setup pnpm
         run: |
@@ -681,14 +647,14 @@ jobs:
           go mod download
         shell: bash
 
-      - name: Build Windows Desktop Installer (SFW-HX)
+      - name: Build Windows Desktop Installer (SFW-HX Multi-Arch)
         run: |
           cd clients/desktop
           pnpm install --frozen-lockfile=false
           pnpm -C dashboard install --frozen-lockfile=false
           pnpm -C dashboard generate
           pnpm generate
-          pnpm package:win x64
+          pnpm package:win
           mkdir -p ../../desktop-windows-dist
           cp release/SFW-HX-*.exe ../../desktop-windows-dist/
           ls -la ../../desktop-windows-dist/
@@ -796,11 +762,14 @@ jobs:
               - **巨魔免签独立双开 (TrollStore IPA)**: `SFI-HX-${{ env.VERSION }}-trollstore.ipa`，支持全套 VPN 权限。
               - **越狱环境 (Jailbreak DEB)**: `SFI-HX-${{ env.VERSION }}-iphoneos-arm64.deb` (rootless) 与 `arm64e.deb` (rootful)。
               - **二次开发 SDK (带精准版本号)**: `Libbox-HX-${{ env.VERSION }}.xcframework.zip`。
-            - **Windows 桌面端 (SFW-HX 官方图形安装包)**:
-              - **SFW-HX 客户端 (EXE)**: `SFW-HX-${{ env.VERSION }}-x64.exe`，集成独立控制面板与 sing-box 守护进程。
+            - **Windows 桌面端 (SFW-HX 官方多架构图形安装包)**:
+              - **SFW-HX 客户端 (EXE)**: `SFW-HX-${{ env.VERSION }}-x64.exe` (64位标准版), `SFW-HX-${{ env.VERSION }}-x86.exe` (32位老旧 PC), `SFW-HX-${{ env.VERSION }}-arm64.exe` (骁龙 X / ARM64 PC)。
               - **命令行内核 (CLI Core)**: `sing-box-${{ env.VERSION }}-windows-amd64.zip`、`arm64.zip`、`386.zip`。
-            - **macOS 桌面端 (SFM-HX 官方原生图形客户端)**:
-              - **SFM-HX 客户端 (DMG & ZIP)**: `SFM-HX-${{ env.VERSION }}-Universal.dmg` 与 `SFM-HX-${{ env.VERSION }}-Universal.zip`（原生状态栏客户端，同时适配 Apple Silicon M 系列与 Intel Mac 电脑）。
+            - **macOS 桌面端 (SFM-HX 官方多架构原生图形客户端)**:
+              - **SFM-HX 客户端 (DMG / PKG / ZIP 全覆盖)**:
+                - `Apple`: `SFM-HX-${{ env.VERSION }}-Apple.dmg`、`.pkg`、`.zip`（专为 M1/M2/M3/M4 Apple Silicon 芯片优化）
+                - `Intel`: `SFM-HX-${{ env.VERSION }}-Intel.dmg`、`.pkg`、`.zip`（专为 Intel 架构 Mac 优化）
+                - `Universal`: `SFM-HX-${{ env.VERSION }}-Universal.dmg`、`.pkg`、`.zip`（双架构通用包）
               - **命令行内核 (CLI Core)**: `sing-box-${{ env.VERSION }}-darwin-arm64.tar.gz` 与 `darwin-amd64.tar.gz`。
             - **Linux 桌面端 (SFL-HX 官方图形客户端)**:
               - **SFL-HX 客户端**: `SFL-HX-${{ env.VERSION }}-amd64.deb`、`SFL-HX-${{ env.VERSION }}-x86_64.rpm`、`SFL-HX-${{ env.VERSION }}-x64.pkg.tar.zst`（带 Wayland 托盘与 polkit 提权服务）。

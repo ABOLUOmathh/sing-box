@@ -1,0 +1,62 @@
+name: Build and Upload SFM (macOS Multi-Arch GUI: Apple, Intel, Universal)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.14.4-hx.4)'
+        required: true
+        default: 'v1.14.4-hx.4'
+
+permissions:
+  contents: write
+
+jobs:
+  build-sfm:
+    name: Build Desktop macOS (SFM GUI Multi-Arch)
+    runs-on: macos-15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Select Xcode 16
+        run: |
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app
+          elif [ -d /Applications/Xcode_16.3.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.3.app
+          elif [ -d /Applications/Xcode_16.2.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.2.app
+          elif [ -d /Applications/Xcode_16.1.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.1.app
+          else
+            sudo xcode-select -s /Applications/Xcode.app
+          fi
+          xcodebuild -version
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.10'
+          cache: false
+
+      - name: Determine Version
+        run: |
+          TAG_NAME="${{ github.event.inputs.tag_name }}"
+          VERSION="${TAG_NAME#v}"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Build and Package SFM Multi-Arch (Apple, Intel, Universal)
+        run: |
+          bash .github/package_sfm.sh "${{ env.VERSION }}" "$PWD/sfm-dist"
+
+      - name: Upload SFM to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Uploading SFM assets to release ${{ env.TAG_NAME }}..."
+          gh release upload "${{ env.TAG_NAME }}" sfm-dist/* --clobber -R "${{ github.repository }}"

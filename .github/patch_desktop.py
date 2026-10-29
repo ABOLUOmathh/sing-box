@@ -149,6 +149,15 @@ def main():
         )
     ])
 
+    # 6. Patch windowsShare.ts to fallback to crossCompile if native build fails
+    ws_ts = os.path.join(desktop_dir, "scripts", "windowsShare.ts")
+    patch_file(ws_ts, [
+        (
+            '  if (process.platform === "win32") {\n    buildOnWindows(supportedArchitecture, outputPath);\n  } else {',
+            '  if (process.platform === "win32") {\n    try {\n      buildOnWindows(supportedArchitecture, outputPath);\n    } catch (e) {\n      console.warn(`[windowsShare] native build failed for ${architecture}: ${e}. Falling back to crossCompile...`);\n      crossCompile(supportedArchitecture, outputPath);\n    }\n  } else {'
+        )
+    ])
+
     print("Desktop client patches complete.")
 
 if __name__ == "__main__":
