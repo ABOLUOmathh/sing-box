@@ -1,4 +1,4 @@
-name: Build and Upload SFM (macOS Multi-Arch GUI: Apple, Intel, Universal)
+name: "Build and Upload SFM (macOS Multi-Arch GUI)"
 
 on:
   workflow_dispatch:
