@@ -12,7 +12,7 @@ EOF
 chmod +x "$DUMMY_BIN_DIR/swiftlint"
 export PATH="$DUMMY_BIN_DIR:$PATH"
 
-VERSION="${1:-1.14.4-hx.4}"
+VERSION="${1:-1.14.4-hx.5}"
 OUTPUT_DIR="${2:-$PWD/ios-dist}"
 mkdir -p "$OUTPUT_DIR"
 
