@@ -37,7 +37,7 @@ def main():
     desktop_dir = os.path.join(root, "clients", "desktop")
 
     # Determine target version
-    target_version = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("VERSION", "1.14.4")
+    target_version = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("VERSION", "1.14.5")
     if target_version.startswith("v"):
         target_version = target_version[1:]
 
@@ -46,9 +46,9 @@ def main():
         res = subprocess.run(["go", "env", "GOVERSION"], stdout=subprocess.PIPE, text=True, check=True)
         go_ver = res.stdout.strip()
     except Exception:
-        go_ver = "go1.26.10"
+        go_ver = "go1.27.4"
     if not go_ver:
-        go_ver = "go1.26.10"
+        go_ver = "go1.27.4"
 
     # 1. Update version.json directly
     version_json_path = os.path.join(desktop_dir, "version.json")

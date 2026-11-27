@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v1.14.4-hx.5)'
+        description: 'Release Tag (e.g. v1.14.5-hx.1)'
         required: true
-        default: 'v1.14.4-hx.5'
+        default: 'v1.14.5-hx.1'
 
 permissions:
   contents: write
@@ -40,7 +40,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.4'
           cache: false
 
       - name: Install Apple build tools

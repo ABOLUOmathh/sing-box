@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v1.14.4-hx.5)'
+        description: 'Release Tag (e.g. v1.14.5-hx.1)'
         required: false
         default: ''
 
@@ -43,7 +43,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.4'
           cache: false
 
       - name: Install Apple build tools
@@ -60,7 +60,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.5"
+            TAG_NAME="v1.14.5-hx.1"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -135,7 +135,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.4'
           cache: false
 
       - name: Setup OpenJDK 17
@@ -157,7 +157,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.5"
+            TAG_NAME="v1.14.5-hx.1"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -242,14 +242,14 @@ jobs:
 
           # 3. Synchronize version.properties
           cat > clients/android/version.properties <<EOF
-          VERSION_CODE=749
+          VERSION_CODE=750
           VERSION_NAME=${VERSION}
-          GO_VERSION=go1.26.10
+          GO_VERSION=go1.27.4
           EOF
 
           # 4. Apply custom package name, app name, update check redirection & silent update prompt
           python3 -c '
-          import glob
+          import glob, os
 
           with open("clients/android/app/build.gradle.kts", "r") as f:
               gradle_kts = f.read()
@@ -273,6 +273,17 @@ jobs:
               )
               with open(s_file, "w") as f:
                   f.write(data)
+
+          shortcuts_xml = "clients/android/app/src/main/res/xml/shortcuts.xml"
+          if os.path.isfile(shortcuts_xml):
+              with open(shortcuts_xml, "r") as f:
+                  sc_data = f.read()
+              sc_data = sc_data.replace(
+                  "android:targetPackage=\"io.nekohasekai.sfa\"",
+                  "android:targetPackage=\"io.nekohasekai.sfa.hx\""
+              )
+              with open(shortcuts_xml, "w") as f:
+                  f.write(sc_data)
 
           # Redirect update check URL to ABOLUOmathh/sing-box releases
           checker_kt = "clients/android/app/src/github/java/io/nekohasekai/sfa/vendor/GitHubUpdateChecker.kt"
@@ -336,7 +347,7 @@ jobs:
           cd "$ROOT_DIR"
           cat > "$ROOT_DIR/android-dist/SFA-version-metadata.json" << EOF
           {
-            "version_code": 749,
+            "version_code": 750,
             "version_name": "${VERSION}"
           }
           EOF
@@ -402,7 +413,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.4'
           cache: false
 
       - name: Determine Version
@@ -412,7 +423,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.5"
+            TAG_NAME="v1.14.5-hx.1"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -539,7 +550,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.4'
           cache: false
 
       - name: Setup Node.js
@@ -568,7 +579,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.5"
+            TAG_NAME="v1.14.5-hx.1"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -610,7 +621,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.10'
+          go-version: '1.27.4'
           cache: false
 
       - name: Setup Node.js
@@ -636,7 +647,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.5"
+            TAG_NAME="v1.14.5-hx.1"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -685,7 +696,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
           else
-            TAG_NAME="v1.14.4-hx.5"
+            TAG_NAME="v1.14.5-hx.1"
           fi
           VERSION="${TAG_NAME#v}"
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
@@ -716,7 +727,7 @@ jobs:
             ## sing-boxHX ${{ env.VERSION }} (Full-Matrix Release with Custom Branding)
 
             ### 🇨🇳 中文说明 (Chinese Description)
-            基于官方 sing-box **v1.14.4** 深度适配四大专有协议，对齐官方标准实现 **全平台、全架构全量构建**（涵盖 Windows/macOS/Linux/Android/iOS 官方五大全套客户端 SFW/SFM/SFL/SFA/SFI，以及 Linux/BSD/OpenWrt 路由器全系资产，总计 140+ 产物）。
+            基于官方 sing-box **v1.14.5** 深度适配四大专有协议，对齐官方标准实现 **全平台、全架构全量构建**（涵盖 Windows/macOS/Linux/Android/iOS 官方五大全套客户端 SFW/SFM/SFL/SFA/SFI，以及 Linux/BSD/OpenWrt 路由器全系资产，总计 140+ 产物）。
 
             #### 🏷️ 独立包名与应用名称（双开共存，互不干扰）
             - **iOS 苹果端**:
@@ -788,4 +799,4 @@ jobs:
             ---
 
             ### 🇺🇸 English Description
-            Custom full-matrix release of sing-box **v1.14.4** with native support for 4 custom protocols, dual-channel latency testing, custom package branding (`io.nekohasekai.sfa.hx`, `sing-boxHX`), dual-app coexistence IPA/APKs, official desktop clients suite (SFW-HX, SFM-HX, SFL-HX), full OpenWrt/Arch/Alpine package matrix, and cross-platform core binaries.
+            Custom full-matrix release of sing-box **v1.14.5** with native support for 4 custom protocols, dual-channel latency testing, custom package branding (`io.nekohasekai.sfa.hx`, `sing-boxHX`), dual-app coexistence IPA/APKs, official desktop clients suite (SFW-HX, SFM-HX, SFL-HX), full OpenWrt/Arch/Alpine package matrix, and cross-platform core binaries.
